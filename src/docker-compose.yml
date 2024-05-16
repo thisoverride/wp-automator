@@ -7,10 +7,10 @@ services:
       - db_data:/var/lib/mysql
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: example_root_password
+      MYSQL_ROOT_PASSWORD: _{MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: wordpress
-      MYSQL_USER: wordpress_user
-      MYSQL_PASSWORD: example_password
+      MYSQL_USER: _{MYSQL_USER}
+      MYSQL_PASSWORD: _{MYSQL_PASSWORD}
     ports:
       - "3306:3306"
 
@@ -19,11 +19,11 @@ services:
     depends_on:
       - db
     environment:
-      MYSQL_ROOT_PASSWORD: example_root_password
+      MYSQL_ROOT_PASSWORD: _{MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: wordpress
-      MYSQL_USER: wordpress_user
-      MYSQL_PASSWORD: example_password
-    command: ["bash", "-c", "sleep 10 && mysql -hdb -u root -p example_root_password -e 'CREATE DATABASE IF NOT EXISTS wordpress;'"]
+      MYSQL_USER: _{MYSQL_USER}
+      MYSQL_PASSWORD: _{MYSQL_PASSWORD}
+    command: ["bash", "-c", "sleep 10 && mysql -hdb -u root -p _{MYSQL_ROOT_PASSWORD} -e 'CREATE DATABASE IF NOT EXISTS wordpress;'"]
 
   wordpress:
     image: wordpress:latest
@@ -32,8 +32,8 @@ services:
     restart: always
     environment:
       WORDPRESS_DB_HOST: db:3306
-      WORDPRESS_DB_USER: wordpress_user
-      WORDPRESS_DB_PASSWORD: example_password
+      WORDPRESS_DB_USER: _{MYSQL_USER}
+      WORDPRESS_DB_PASSWORD: _{MYSQL_PASSWORD}
       WORDPRESS_DB_NAME: wordpress
     volumes:
       - ./wp-content:/var/www/html/wp-content
