@@ -1,0 +1,42 @@
+version: '3'
+
+services:
+  db:
+    image: mysql:latest
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: example_root_password
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress_user
+      MYSQL_PASSWORD: example_password
+    ports:
+      - "3306:3306"
+
+  wordpress_db_init:
+    image: mysql:latest
+    depends_on:
+      - db
+    environment:
+      MYSQL_ROOT_PASSWORD: example_root_password
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress_user
+      MYSQL_PASSWORD: example_password
+    command: ["bash", "-c", "sleep 10 && mysql -hdb -u root -p example_root_password -e 'CREATE DATABASE IF NOT EXISTS wordpress;'"]
+
+  wordpress:
+    image: wordpress:latest
+    ports:
+      - "8000:80" # Change port as needed
+    restart: always
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wordpress_user
+      WORDPRESS_DB_PASSWORD: example_password
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - ./wp-content:/var/www/html/wp-content
+
+volumes:
+  db_data:
