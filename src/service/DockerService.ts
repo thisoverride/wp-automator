@@ -1,6 +1,9 @@
 import fs from 'node:fs';
+import Dockerode from 'dockerode';
 import { Request, Response } from 'express'; 
-import path from 'path'
+import path from 'path';
+import yaml from 'js-yaml';
+import DockerServiceException from '../core/exception/DockerServiceException';
 
 export default class DockerService {
 
@@ -44,4 +47,39 @@ public  async generateDocker(request:Request){
 }
 
 // public getAllFolders() TODO
+
+public async build(request: Request) {
+  const { appName } = request.query;
+
+  if (!appName) {
+    throw new Error('Le paramètre est vide : appName');
+  }
+  const folderPath: string = path.join(__dirname, '..', '..', '..', `/wp-sites/${appName}`);
+
+    if (!fs.existsSync(folderPath)) {
+      throw new DockerServiceException('Ce projet n\'existe pas', 500);
+    }
+    const dockerComposePath: string = path.join(folderPath, 'docker-compose.yml');
+
+    if (!fs.existsSync(dockerComposePath)) {
+      throw new DockerServiceException('Ce projet ne contient pas de modèle de configuration Docker (docker-compose.yml)', 500);
+    }
+
+    const docker: Dockerode = new Dockerode();
+    const dockerComposeYml: string = fs.readFileSync(dockerComposePath, 'utf8');
+    const composeConfig: string = yaml.load(dockerComposeYml) as string;
+  
+
+    docker.run(composeConfig, [], process.stdout).then(function(container) {
+      console.log(container.output.StatusCode);
+      return container.remove();
+    }).then(function(data) {
+      console.log('container removed');
+    }).catch(function(err) {
+      console.log(err);
+    });
+
+
+    return { message: `Conteneur ID`, status: 200 };
+  }
 }

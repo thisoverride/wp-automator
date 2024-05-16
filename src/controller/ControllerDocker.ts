@@ -10,7 +10,8 @@ export default class DockerController implements Controller {
     console.log(dockerService)
     this._dockerService = dockerService;
     this.ROUTE = [
-      '@POST(/generate-docker,generate)'
+      '@POST(/generate-docker,generate)',
+      '@GET(/build-app,runBuildMachine)'
     ];
   }
 
@@ -21,6 +22,15 @@ export default class DockerController implements Controller {
     } catch (error) {
       // console.error(error);
       throw error
+    }
+  }
+
+  public async runBuildMachine(request: Request, response: Response): Promise<void> {
+    try {
+      const res = await this._dockerService.build(request);
+      response.status(200).send(res);
+    } catch (error: any) {
+      response.status(error.status || 500).json({ message: error.message });
     }
   }
 }
