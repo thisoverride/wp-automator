@@ -1,3 +1,3 @@
-export interface ControllerImpl {
+export interface Controller {
   ROUTE: string[];
 }
