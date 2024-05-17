@@ -653,7 +653,14 @@
     "@types/node" "*"
     "@types/ssh2" "*"
 
-"@types/dockerode@^3.3.29":
+"@types/dockerode-compose@^1.4.1":
+  version "1.4.1"
+  resolved "https://registry.yarnpkg.com/@types/dockerode-compose/-/dockerode-compose-1.4.1.tgz#d0151342dddd5aa1159b8ad22cc2a37282b7bcf7"
+  integrity sha512-AouE5+t2bghPrCxWGabBGqvXQDF1Hym0NCuCVDzI3vI5KbucWyLBPUIwZK+a9qb3v2Wr9VvBJzHrHLS5r1VM/w==
+  dependencies:
+    "@types/dockerode" "*"
+
+"@types/dockerode@*", "@types/dockerode@^3.3.29":
   version "3.3.29"
   resolved "https://registry.yarnpkg.com/@types/dockerode/-/dockerode-3.3.29.tgz#7d3c99a91c381115015587a8a2a71002029e1740"
   integrity sha512-5PRRq/yt5OT/Jf77ltIdz4EiR9+VLnPF+HpU4xGFwUqmV24Co2HKBNW3w+slqZ1CYchbcDeqJASHDYWzZCcMiQ==
@@ -1331,7 +1338,16 @@ docker-modem@^5.0.3:
     split-ca "^1.0.1"
     ssh2 "^1.15.0"
 
-dockerode@^4.0.2:
+dockerode-compose@^1.4.0:
+  version "1.4.0"
+  resolved "https://registry.yarnpkg.com/dockerode-compose/-/dockerode-compose-1.4.0.tgz#efed46a144e4b8904be87361822fc6e08c16c518"
+  integrity sha512-6x5ZlK06H+cgoTR4ffucqN5kWVvxNvxwTLcHQUZcegCJBEDGrdzXMOEGDMsxbHwiLtLo2dNwG0eZK7B2RfEWSw==
+  dependencies:
+    dockerode "^4.0.0"
+    js-yaml "^4.0.0"
+    tar-fs "^2.1.1"
+
+dockerode@^4.0.0, dockerode@^4.0.2:
   version "4.0.2"
   resolved "https://registry.yarnpkg.com/dockerode/-/dockerode-4.0.2.tgz#dedc8529a1db3ac46d186f5912389899bc309f7d"
   integrity sha512-9wM1BVpVMFr2Pw3eJNXrYYt6DT9k0xMcsSCjtPvyQ+xa1iPg/Mo3T/gUcwI0B2cczqCeCYRPF8yFYDwtFXT0+w==
@@ -2216,7 +2232,7 @@ js-yaml@^3.13.1:
     argparse "^1.0.7"
     esprima "^4.0.0"
 
-js-yaml@^4.1.0:
+js-yaml@^4.0.0, js-yaml@^4.1.0:
   version "4.1.0"
   resolved "https://registry.yarnpkg.com/js-yaml/-/js-yaml-4.1.0.tgz#c1fb65f8f5017901cdd2c951864ba18458a10602"
   integrity sha512-wpxZs9NoxZaJESJGIZTyDEaYpl0FKSA+FB9aJiyemKhMwkxQg63h4T1KJgUGHpTqPDNRcmmYLugrRjJlBtWvRA==
@@ -2910,6 +2926,16 @@ supports-preserve-symlinks-flag@^1.0.0:
   resolved "https://registry.yarnpkg.com/supports-preserve-symlinks-flag/-/supports-preserve-symlinks-flag-1.0.0.tgz#6eda4bd344a3c94aea376d4cc31bc77311039e09"
   integrity sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==
 
+tar-fs@^2.1.1:
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/tar-fs/-/tar-fs-2.1.1.tgz#489a15ab85f1f0befabb370b7de4f9eb5cbe8784"
+  integrity sha512-V0r2Y9scmbDRLCNex/+hYzvp/zyYjvFbHPNgVTKfQvVrb6guiE/fxP+XblDNR011utopbkex2nM4dHNV6GDsng==
+  dependencies:
+    chownr "^1.1.1"
+    mkdirp-classic "^0.5.2"
+    pump "^3.0.0"
+    tar-stream "^2.1.4"
+
 tar-fs@~2.0.1:
   version "2.0.1"
   resolved "https://registry.yarnpkg.com/tar-fs/-/tar-fs-2.0.1.tgz#e44086c1c60d31a4f0cf893b1c4e155dabfae9e2"
@@ -2920,7 +2946,7 @@ tar-fs@~2.0.1:
     pump "^3.0.0"
     tar-stream "^2.0.0"
 
-tar-stream@^2.0.0:
+tar-stream@^2.0.0, tar-stream@^2.1.4:
   version "2.2.0"
   resolved "https://registry.yarnpkg.com/tar-stream/-/tar-stream-2.2.0.tgz#acad84c284136b060dc3faa64474aa9aebd77287"
   integrity sha512-ujeqbceABgwMZxEJnk2HDY2DlnUZ+9oEcb1KzTVfYHio0UE6dG71n60d8D2I4qNvleWrrXpmjpt7vZeF1LnMZQ==
