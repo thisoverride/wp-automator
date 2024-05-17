@@ -15,9 +15,9 @@ export default class DockerService {
     if (!fs.existsSync(folderPath)) {
       fs.mkdirSync(folderPath);
       const replacements = {
-        '_{MYSQL_ROOT_PASSWORD}': mysql_root_psswd,
-        '_{MYSQL_USER}': mysql_user,
-        '_{MYSQL_PASSWORD}': mysql_psswd
+        '%{MYSQL_ROOT_PASSWORD}': mysql_root_psswd,
+        '%{MYSQL_USER}': mysql_user,
+        '%{MYSQL_PASSWORD}': mysql_psswd
       };
 
       try {
@@ -26,6 +26,7 @@ export default class DockerService {
         // Replace words
         let modifiedData = data;
         for (const [oldWord, newWord] of Object.entries(replacements)) {
+
           const regex = new RegExp(oldWord, 'g');
           modifiedData = modifiedData.replace(regex, newWord);
         }
