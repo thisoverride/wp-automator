@@ -5,8 +5,6 @@ import { promisify } from 'util';
 const readFile = promisify(fs.readFile);
 const writeFile = promisify(fs.writeFile);
 import Dockerode from 'dockerode';
-import { Request, Response } from 'express'; 
-import path from 'path';
 import yaml from 'js-yaml';
 import DockerServiceException from '../core/exception/DockerServiceException';
 
