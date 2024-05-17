@@ -18,10 +18,9 @@ export default class DockerController implements Controller {
   public async generate(request: Request, response: Response): Promise<void> {
     try {
       const res = await this._dockerService.generateDocker(request);
-      response.status(200).send(res);
-    } catch (error) {
-      // console.error(error);
-      throw error
+      response.status(200).json({ response : res });
+    } catch (error: any) {
+      response.status(400).json({ error: error.message });
     }
   }
 
