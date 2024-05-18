@@ -68,7 +68,7 @@ export default class DockerService {
 public async build(appName: string): Promise<HttpResponse> {
   try {
     if (!appName) throw new DockerServiceException ('Le paramètre est vide : appName', HttpStatusCodes.BAD_REQUEST);
-    const folderPath: string = this.WP_SITES_DIR_PATH + appName;
+    const folderPath: string = path.join(this.WP_SITES_DIR_PATH , appName);
     
     if (!fs.existsSync(folderPath)) throw new DockerServiceException('Ce projet n\'existe pas', HttpStatusCodes.NOT_FOUND);
     const dockerComposePath: string = path.join(folderPath, 'docker-compose.yml');
