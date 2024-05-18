@@ -19,7 +19,7 @@ const logger = winston.createLogger({
 (async () => {
   try {
     logger.info('Launching the browser...');
-    const browser = await puppeteer.launch({ headless: true   });
+    const browser = await puppeteer.launch({ headless: false   });
     const page = await browser.newPage();
     logger.info('Setting screen size...');
 
@@ -37,13 +37,14 @@ const logger = winston.createLogger({
 
     logger.info('Filling in site information...');
     await page.waitForSelector('#weblog_title');
-    const noIndexSite = await page.$('#blog_public');
 
     await page.type('#weblog_title', 'exemple');
     await page.type('#user_login', 'exemple_username');
     await page.type('#pass1', 'exemple_password');
     await page.type('#admin_email', 'exemple@admin.com');
-    await noIndexSite.click();
+    await page.click('#blog_public')
+
+    await new Promise(resolve => setTimeout(resolve, 900));
     let btnNext = (await page.$$('input[type="submit"]'))[0];
     await btnNext.click();
 
