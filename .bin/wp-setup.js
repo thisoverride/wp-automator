@@ -19,7 +19,7 @@ const logger = winston.createLogger({
 (async () => {
   try {
     logger.info('Launching the browser...');
-    const browser = await puppeteer.launch({ headless: false   });
+    const browser = await puppeteer.launch({ headless: true   });
     const page = await browser.newPage();
     logger.info('Setting screen size...');
 
