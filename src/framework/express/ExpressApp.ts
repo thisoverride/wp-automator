@@ -4,6 +4,7 @@ import morgan from 'morgan';
 import helmet from 'helmet';
 import DockerController from '../../controller/ControllerDocker';
 import DockerService from '../../service/DockerService';
+import Dockerode from 'dockerode';
 
 export default class ExpressApp {
   private readonly _app: Application;
@@ -20,7 +21,7 @@ export default class ExpressApp {
     this._initExpressApp();
     this._pathValidator = new PathValidator();
     this._controller = [
-      new DockerController(new DockerService())
+      new DockerController(new DockerService(new Dockerode()))
     ];
     this._injectControllers();
     this._setupErrorHandling();
@@ -81,7 +82,6 @@ export default class ExpressApp {
    */
   public async startEngine (port: number): Promise<void> {
     try {
-      // await database.authenticate();
       this._app.listen(port, () => {
         console.info('\x1b[1m\x1b[36m%s\x1b[0m', `Service running on http://localhost:${port}`);
       });
