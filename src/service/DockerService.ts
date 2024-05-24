@@ -214,9 +214,7 @@ export default class DockerService {
   
       pythonProcess.on('close', (code) => {
         if (code === 0) {
-          // Vérifier si stdoutData est null ou undefined
           if (stdoutData !== null && stdoutData !== undefined) {
-            // Utiliser une expression régulière pour extraire les numéros de ports
             const portRegex = /\d+/g;
             const matchResult = stdoutData.match(portRegex);
   

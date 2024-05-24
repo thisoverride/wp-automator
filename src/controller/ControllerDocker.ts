@@ -44,7 +44,6 @@ export default class DockerController implements Controller {
  * @returns {Promise<void>}
  */
   public async createTemplate(request: Request, response: Response): Promise<void> {
-    console.log(typeof request.body.dirname)
     const requestBody = {
       dirname: request.body.dirname,
       username: request.body.username,
