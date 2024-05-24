@@ -5,7 +5,7 @@ import helmet from 'helmet';
 import DockerController from '../../controller/ControllerDocker';
 import DockerService from '../../service/DockerService';
 import Dockerode from 'dockerode';
-
+import cors from 'cors';
 export default class ExpressApp {
   private readonly _app: Application;
   private readonly _controller: any[];
@@ -68,6 +68,7 @@ export default class ExpressApp {
   }
 
   private _initExpressApp (): void {
+    this._app.use(cors());
     this._app.use(helmet());
     this._app.use(express.json());
     this._app.use(morgan('dev'));

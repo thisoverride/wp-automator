@@ -1,85 +1,108 @@
 import fs from 'node:fs';
-import { Request, Response } from 'express';
 import path from 'path'
-import { promisify } from 'util';
-const readFile = promisify(fs.readFile);
-const writeFile = promisify(fs.writeFile);
+import { HttpStatusCodes , DirManager } from '../utils/Utils'
 import Dockerode, { ContainerInfo, ContainerInspectInfo, ImageInfo } from 'dockerode';
-import DockerodeCompose from 'dockerode-compose';
+import { v2 as compose } from 'docker-compose'
 import DockerServiceException from '../core/exception/DockerServiceException';
 import { HttpResponse } from '../controller/ControllerInterface';
-import HttpStatusCodes from '../utils/HttpStatusCode';
+import { requestBodySchema } from '../utils/schema'
+import { spawn } from 'node:child_process';
+import type { GenerateRequestBody } from '../@type/global';
 
 export default class DockerService {
   private readonly _docker: Dockerode;
-  private readonly WP_SITES_DIR_PATH: string = path.join(__dirname, '..', '..', '..', '/wp-sites/');
+  private static readonly WP_SITES_DIR_PATH: string = path.join(__dirname, '..', '..', '..', '/wp-sites/');
 
   public constructor(dockernode: Dockerode) {
     this._docker = dockernode;
   }
 
-  public async generateDocker(request: Request) {
-    const { foldername, mysql_root_psswd, mysql_user, mysql_psswd } = request.body;
-    // console.log(request.body);
+  public async buildTemplate(requestBody: GenerateRequestBody): Promise<HttpResponse> {
+    try {
+      const { error, value } = requestBodySchema.validate(requestBody);
+      if (error) {
+        throw new DockerServiceException(
+          `${error.message}`, HttpStatusCodes.BAD_REQUEST);
+      }
+      const availablePort = await this.executePythonScript() as any;
 
-    const folderPath = path.join(__dirname, '..', '..', '..', `/wp-sites/${foldername}`)
-    if (!fs.existsSync(folderPath)) {
-      fs.mkdirSync(folderPath);
-      const replacements = {
-        '%{MYSQL_ROOT_PASSWORD}': mysql_root_psswd,
-        '%{MYSQL_USER}': mysql_user,
-        '%{MYSQL_PASSWORD}': mysql_psswd
-      };
+      if (!availablePort.ports.includes(parseInt(requestBody.wpPort.toString()))) {
+        throw new DockerServiceException
+        (`Le port ${requestBody.wpPort} est n'est pas disponible`,HttpStatusCodes.BAD_REQUEST);
+      }
+      if (!availablePort.ports.includes(parseInt(requestBody.mysqlPort.toString()))) {
+        throw new DockerServiceException
+        (`Le port ${requestBody.mysqlPort} est n'est pas disponible`, HttpStatusCodes.BAD_REQUEST);
+      }
+      
 
-      try {
-        let data = await readFile(`src/docker-compose.yml`, 'utf8');
+    
+      const folderPath: string = path.join(DockerService.WP_SITES_DIR_PATH, requestBody.dirname);
+      if (await DirManager.folderExists(folderPath)) {
+        throw new DockerServiceException(
+          `Le projet "${requestBody.dirname}" ne peut pas être créé car il existe déjà.`,
+          HttpStatusCodes.BAD_REQUEST
+        );
+      }
+      
+      let templatePath: string = path.join(__dirname, '..','..','.bin','.platform','docker-compose.yml');
+      const templateFile = await DirManager.readfile(templatePath);
 
-        // Replace words
-        let modifiedData = data;
-        for (const [oldWord, newWord] of Object.entries(replacements)) {
-
-          const regex = new RegExp(oldWord, 'g');
-          modifiedData = modifiedData.replace(regex, newWord);
-        }
-
-        if (mysql_root_psswd.length < 8 || mysql_psswd.length < 8) {
-          throw new Error("Password should have at least 8 characters from both MySQL root and user");
-        }
-
-        if (mysql_user.length < 4) {
-          throw new Error("MySQL username should have at least 4 characters");
-        }
-        // Write the modified file
-        await writeFile(`${folderPath}/docker-compose.yml`, modifiedData, 'utf8');
-
-        return 'The file has been successfully generated!';
-      } catch (err) {
-        throw new Error('Error reading or writing the file: ' + err);
+      if(!templateFile){
+        throw new DockerServiceException
+        (`Impossible de localiser la source ${templatePath}`,HttpStatusCodes.NOT_FOUND);
       }
 
-    } else {
-      throw new Error("The folder already exist");
-    }
-
-  }
-
-// public getAllFolders() TODO
-
-public async build(appName: string): Promise<HttpResponse> {
-  try {
-    if (!appName) throw new DockerServiceException ('Le paramètre est vide : appName', HttpStatusCodes.BAD_REQUEST);
-    const folderPath: string = path.join(this.WP_SITES_DIR_PATH , appName);
-    
-    if (!fs.existsSync(folderPath)) throw new DockerServiceException('Ce projet n\'existe pas', HttpStatusCodes.NOT_FOUND);
-    const dockerComposePath: string = path.join(folderPath, 'docker-compose.yml');
-  
-    if (!fs.existsSync(dockerComposePath)) throw new DockerServiceException
-      (`Ce projet ne contient pas de modèle de configuration Docker (docker-compose.yml)`, 
-      HttpStatusCodes.NOT_FOUND);
-      const compose = new DockerodeCompose(this._docker,dockerComposePath, appName.toString());
-      const containerInfo = await compose.up();
+      const replacements = {
+        '%{INSTANCE_NUMBER}': '8765764reg',
+        '%{MYSQL_ROOT_PASSWORD}': requestBody.mysqlRootPassword.toString(),
+        '%{MYSQL_USER}': requestBody.mysqlUser.toString(),
+        '%{MYSQL_PASSWORD}': requestBody.wpPassword.toString(),
+        '%{DB_PORT}': requestBody.mysqlPort.toString(),
+        '%{WORDPRESS_PORT}': requestBody.wpPort.toString()
+      };
       
-    return { message: containerInfo.volumes[0].Status , status: HttpStatusCodes.OK };
+      const generatedTemplate: string = DirManager.replaceTemplateFlags(templateFile,replacements);
+      if(await DirManager.createDir(folderPath)){
+        if(!await DirManager.writeFile(folderPath + '/docker-compose.yml', generatedTemplate)){
+          await DirManager.deleteDir(folderPath);
+          throw new DockerServiceException('Erreur lors de l\'écriture du fichier',HttpStatusCodes.INTERNAL_SERVER_ERROR);
+        }
+      }else {
+        throw new DockerServiceException('Erreur lors de creation du dossier',HttpStatusCodes.INTERNAL_SERVER_ERROR);
+      }
+      return { message: 'Le template a été généré avec succès.' , status: HttpStatusCodes.OK }
+    } catch (error) {
+      return this.handleError(error);
+    }    
+  }
+  
+  public async build(appName: string): Promise<HttpResponse> {
+    try {
+      if (!appName) throw new DockerServiceException ('Le paramètre est vide : appName', HttpStatusCodes.BAD_REQUEST);
+      const folderPath: string = path.join(DockerService.WP_SITES_DIR_PATH , appName);
+    
+      if (!fs.existsSync(folderPath)) throw new DockerServiceException('Ce projet n\'existe pas', HttpStatusCodes.NOT_FOUND);
+      const dockerComposePath: string = path.join(folderPath, 'docker-compose.yml');
+  
+      if (!fs.existsSync(dockerComposePath)){
+        throw new DockerServiceException
+        (`Ce projet ne contient pas de modèle de configuration Docker (docker-compose.yml)`, 
+        HttpStatusCodes.NOT_FOUND);
+      } 
+
+      compose.pullAll({ cwd: folderPath, log: true }).then(()=>{
+        console.log('Pulling finish')
+        compose.upAll({ cwd: folderPath, log: true }).then(()=>{
+          console.log('Application is running')
+        }).catch((e)=> {
+          console.log(e)
+        })
+      }).catch((e)=> {
+        console.log('wrs')
+      })
+
+    return { message: 'Lancement de la machine de build' , status: HttpStatusCodes.OK };
   } catch (error) {
     return this.handleError(error);
   }
@@ -107,34 +130,40 @@ public async build(appName: string): Promise<HttpResponse> {
 
   public async startDockerCompose(appName: string): Promise<HttpResponse> {
     try {
-      const dockerComposePath: string = path.join(this.WP_SITES_DIR_PATH , appName, 'docker-compose.yml');
-      const compose = new DockerodeCompose(this._docker,dockerComposePath, appName.toString());
-      await compose.up();
+      const folderPath: string = path.join(DockerService.WP_SITES_DIR_PATH, appName);
+      await compose.upAll({ cwd: folderPath, log: true })
 
       return { message: `Docker Compose for ${appName} started successfully.`, status: HttpStatusCodes.OK };
     } catch (error: any) {
       return this.handleError(error);
     }
   }
+
+
   public async stopDockerCompose(appName: string): Promise<HttpResponse> {
     try {
-      const dockerComposePath: string = path.join(this.WP_SITES_DIR_PATH , appName, 'docker-compose.yml');
-      const compose = new DockerodeCompose(this._docker,dockerComposePath, appName.toString());
-      await compose.down();
+      const folderPath: string = path.join(DockerService.WP_SITES_DIR_PATH , appName);
+      if (!fs.existsSync(folderPath)) throw new DockerServiceException
+      (`Le conteneur ${appName} n'existe pas.`, HttpStatusCodes.NOT_FOUND);
 
+      await compose.downAll({ cwd: folderPath, log: true });
+      
       return { message: `Docker Compose for ${appName} stopped successfully.`, status: HttpStatusCodes.OK };
     } catch (error: any) {
       return this.handleError(error);
     }
   }
 
+
   public async runContainer(containerId: string): Promise<HttpResponse> {
     try {
       const container = this._docker.getContainer(containerId.toString());
       const containerInfo: ContainerInspectInfo = await container.inspect();
       
-      if (containerInfo.State.Running) throw new DockerServiceException
-      ('Container already started', HttpStatusCodes.BAD_REQUEST);
+      if (containerInfo.State.Running){
+        throw new DockerServiceException
+        ('Container already started', HttpStatusCodes.BAD_REQUEST);
+      }
       await container.start();
       
       return { message: `Container ${containerId} begin started successfully.`, status: HttpStatusCodes.OK };
@@ -167,6 +196,50 @@ public async build(appName: string): Promise<HttpResponse> {
       return this.handleError(error);
     }
   }
+
+  private async executePythonScript() {
+    return new Promise((resolve, reject) => {
+      const pythonProcess = spawn('python3', [path.join(__dirname, '..','..','.bin', 'check_all_available_ports.py')]);
+  
+      let stdoutData = '';
+      let stderrData = '';
+  
+      pythonProcess.stdout.on('data', (data) => {
+        stdoutData += data;
+      });
+  
+      pythonProcess.stderr.on('data', (data) => {
+        stderrData += data;
+      });
+  
+      pythonProcess.on('close', (code) => {
+        if (code === 0) {
+          // Vérifier si stdoutData est null ou undefined
+          if (stdoutData !== null && stdoutData !== undefined) {
+            // Utiliser une expression régulière pour extraire les numéros de ports
+            const portRegex = /\d+/g;
+            const matchResult = stdoutData.match(portRegex);
+  
+            if (matchResult !== null) {
+              const portsArray = matchResult.map(Number);
+              resolve({ ports: portsArray, stderr: stderrData });
+            } else {
+              reject('No ports found in the output');
+            }
+          } else {
+            reject('No output received from the Python script');
+          }
+        } else {
+          reject(`Python script execution failed with code ${code}`);
+        }
+      });
+  
+      pythonProcess.on('error', (err) => {
+        reject(`Failed to execute Python script: ${err}`);
+      });
+    });
+  }
+  
 
   private handleError(error: any): HttpResponse {
     console.log(error)

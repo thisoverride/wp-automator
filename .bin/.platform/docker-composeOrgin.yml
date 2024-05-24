@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  db_%{INSTANCE_NUMBER}:
+    image: mysql:latest
+    volumes:
+      - db_data_%{INSTANCE_NUMBER}:/var/lib/mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: "%{MYSQL_ROOT_PASSWORD}"
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: "%{MYSQL_USER}"
+      MYSQL_PASSWORD: "%{MYSQL_PASSWORD}"
+    ports:
+      - "%{DB_PORT}:3306"
+    labels:
+      com.example.service_id: "This label will appear on the db service"
+
+  wordpress_db_init_%{INSTANCE_NUMBER}:
+    image: mysql:latest
+    depends_on:
+      - db_%{INSTANCE_NUMBER}
+    environment:
+      MYSQL_ROOT_PASSWORD: "%{MYSQL_ROOT_PASSWORD}"
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: "%{MYSQL_USER}"
+      MYSQL_PASSWORD: "%{MYSQL_PASSWORD}"
+    command: ["bash", "-c", "sleep 10 && mysql -hdb_%{INSTANCE_NUMBER} -u root -p%{MYSQL_ROOT_PASSWORD} -e 'CREATE DATABASE IF NOT EXISTS wordpress;'"]
+    labels:
+      com.example.description: "This label will appear on the init service"
+      com.docker.compose.service_id: "doflamingo_wordpress_db_init_%{INSTANCE_NUMBER}"
+
+  wordpress_%{INSTANCE_NUMBER}:
+    image: wordpress:latest
+    ports:
+      - "%{WORDPRESS_PORT}:80"
+    restart: always
+    environment:
+      WORDPRESS_DB_HOST: db_%{INSTANCE_NUMBER}:3306
+      WORDPRESS_DB_USER: "%{MYSQL_USER}"
+      WORDPRESS_DB_PASSWORD: "%{MYSQL_PASSWORD}"
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - ./wp-content_%{INSTANCE_NUMBER}:/var/www/html/wp-content
+    depends_on:
+      - wordpress_db_init_%{INSTANCE_NUMBER}
+    labels:
+      com.example.service_id: "This label will appear on the web service"
+
+volumes:
+  db_data_%{INSTANCE_NUMBER}:
+  wp-content_%{INSTANCE_NUMBER}:

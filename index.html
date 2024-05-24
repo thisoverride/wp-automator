@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Informations sur les Conteneurs Docker</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .container { margin-bottom: 20px; padding: 10px; border: 1px solid #ccc; }
+        .container p { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <div id="container-info"></div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', async (event) => {
+    try {
+        const response = await fetch('http://localhost:8002/containers');
+        if (!response.ok) {
+            throw new Error(`Erreur HTTP! Statut: ${response.status}`);
+        }
+        const containers = await response.json();
+        displayContainerInfo(containers);
+    } catch (error) {
+        console.error('Erreur:', error);
+    }
+});
+
+function displayContainerInfo(containers) {
+    const containerInfoDiv = document.getElementById('container-info');
+    containerInfoDiv.innerHTML = ''; // Clear previous content
+    
+    containers.forEach(container => {
+        const containerDiv = document.createElement('div');
+        containerDiv.classList.add('container');
+        
+        const containerId = document.createElement('p');
+        containerId.textContent = `ID du Conteneur: ${container.Id}`;
+        containerDiv.appendChild(containerId);
+        
+        const containerNames = document.createElement('p');
+        containerNames.textContent = `Noms: ${container.Names.join(', ')}`;
+        containerDiv.appendChild(containerNames);
+        
+        const containerImage = document.createElement('p');
+        containerImage.textContent = `Image: ${container.Image}`;
+        containerDiv.appendChild(containerImage);
+
+        // Afficher les labels
+        const containerLabels = document.createElement('p');
+        containerLabels.textContent = 'Labels:';
+        containerDiv.appendChild(containerLabels);
+
+        const labelsList = document.createElement('ul');
+        for (const [key, value] of Object.entries(container.Labels)) {
+            const labelItem = document.createElement('li');
+            labelItem.textContent = `${key}: ${value}`;
+            labelsList.appendChild(labelItem);
+        }
+        containerDiv.appendChild(labelsList);
+        
+        containerInfoDiv.appendChild(containerDiv);
+    });
+}
+
+
+    </script>
+</body>
+</html>
