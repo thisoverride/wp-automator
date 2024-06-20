@@ -3,11 +3,13 @@ export interface GenerateRequestBody {
   username: string;
   email: string;
   wpPassword: string;
+  wpPort: number;
+  wpHost: string;
+  wpProjectName: string;
   mysqlRootPassword: string;
   mysqlUser: string;
   mysqlPassword: string;
   mysqlPort: number;
-  wpPort: number;
   nameApiKey: string;
   rules: string;
 }

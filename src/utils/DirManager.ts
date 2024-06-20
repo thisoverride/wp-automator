@@ -52,5 +52,13 @@ export default class DirManager {
     }
   }
 
-
+  public static async verifyFilePermission(filePath: string, permission: number): Promise<boolean> {
+    try {
+      const stats = await fs.stat(filePath);
+      const filePermission = stats.mode & 0o777;
+      return filePermission === permission;
+    } catch {
+      return false;
+    }
+  }
 }
