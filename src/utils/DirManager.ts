@@ -54,11 +54,20 @@ export default class DirManager {
 
   public static async verifyFilePermission(filePath: string, permission: number): Promise<boolean> {
     try {
-      const stats = await fs.stat(filePath);
-      const filePermission = stats.mode & 0o777;
-      return filePermission === permission;
+      const stats = await fs.stat(filePath); // Récupère les informations du fichier
+      const filePermission = stats.mode & 0o777; // Extrait les permissions du fichier
+      return filePermission === permission; // Vérifie si les permissions correspondent
     } catch {
       return false;
+    }
+  }
+
+  public static async deleteFile(filePath: string): Promise<string> {
+    try {
+      await fs.unlink(filePath);
+      return 'File deleted';
+    } catch (error : any){
+      throw new Error(`Error deleting file: ${error.message}`);
     }
   }
 }
