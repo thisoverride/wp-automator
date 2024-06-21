@@ -4,19 +4,6 @@ import DockerService from '../service/DockerService';
 import HttpStatusCodes from '../utils/HttpStatusCode';
 import { GenerateRequestBody } from '../@type/global.d';
 
-// interface GenerateRequestBody {
-//   dirname: string;
-//   username: string;
-//   email: string;
-//   wpPassword: string;
-//   wpPort: number;
-//   mysqlRootPassword: string;
-//   mysqlUser: string;
-//   mysqlPassword: string;
-//   mysqlPort: number;
-//   nameApiKey: string;
-//   rules: string;
-// }
 export default class DockerController implements Controller {
   public readonly ROUTE: Array<string>;
   private readonly _dockerService: DockerService;
@@ -46,7 +33,7 @@ export default class DockerController implements Controller {
  */
   public async createTemplate(request: Request, response: Response): Promise<void> {
     const requestBody = {
-      dirname: request.body.dirname, // dirname = project name
+      dirname: request.body.dirname,
       username: request.body.username,
       email: request.body.email,
       wpPassword: request.body.wp_psswd,

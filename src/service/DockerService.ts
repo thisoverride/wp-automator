@@ -5,11 +5,9 @@ import Dockerode, { ContainerInfo, ContainerInspectInfo, ImageInfo } from 'docke
 import { v2 as compose } from 'docker-compose'
 import DockerServiceException from '../core/exception/DockerServiceException';
 import { HttpResponse } from '../controller/ControllerInterface';
-import { requestBodySchema } from '../utils/schema'
+import { requestBodySchema } from '../framework/validator/schema'
 import { spawn } from 'node:child_process';
 import type { GenerateRequestBody } from '../@type/global';
-import { exec } from 'child_process';
-import { log } from 'node:console';
 
 export default class DockerService {
     private readonly _docker: Dockerode;
@@ -116,27 +114,12 @@ export default class DockerService {
                         HttpStatusCodes.NOT_FOUND);
             }
 
-            // compose.pullAll({ cwd: folderPath, log: true }).then(() => {
-            //     console.log('Pulling finish')
-            //     compose.upAll({ cwd: folderPath, log: true }).then(() => {
-            //         console.log('Application is running')
-            //         this.executeScript(folderPath).then(() => {
-            //             console.log('Script executed')
-            //         }).catch((e) => console.error(e))
-            //     }).catch((e) => {
-            //         console.error(e)
-            //     })
-            // }).catch((e) => {
-            //     console.error('wrs')
-            // })
-
             await compose.pullAll({ cwd: folderPath, log: true });
             console.log('Pulling finish');
 
             await compose.upAll({ cwd: folderPath, log: true });
             console.log('Application is running');
 
-            // Integrate executeScript here
             await this.executeBashScript(folderPath);
             console.log('Script executed successfully');
 
@@ -277,15 +260,6 @@ export default class DockerService {
     }
 
 
-    private handleError(error: any): HttpResponse {
-        console.log(error)
-        if (error instanceof DockerServiceException) {
-            return { message: error.message, status: error.status };
-        } else {
-            return { message: 'Internal Server Error', status: 500 };
-        }
-    }
-
     private async executeBashScript(folderPath: string) : Promise<void> {
         const scriptPath = `${folderPath}/wpcli_setup.sh`;
         const outputLogPath = `${folderPath}/wpcli_output.log`;
@@ -306,37 +280,41 @@ export default class DockerService {
 
         const wpCliProcess = spawn('sh', [scriptPath], { cwd: folderPath });
 
-        // Capturing stdout
         wpCliProcess.stdout.on('data', (data) => {
             console.log(`${data}`);
             fs.appendFileSync(outputLogPath, data);
         });
 
-        // Capturing stderr
         wpCliProcess.stderr.on('data', (data) => {
             console.error(`${data}`);
             fs.appendFileSync(outputLogPath, data);
         });
 
-        // Handling process exit
         wpCliProcess.on('close', (code) => {
             if (code === 0) {
-                console.log('Script execution completed successfully.');
                 fs.appendFileSync(outputLogPath, 'Script execution completed successfully.');
-                DirManager.deleteFile(scriptPath);
+                if(!DirManager.deleteFile(scriptPath)){
+                    throw new Error(`Error deleting file`);
+                }
             } else {
                 fs.appendFileSync(outputLogPath, `Script execution failed with code ${code}`);
-                console.error(`Script execution failed with code ${code}`);
                 throw new DockerServiceException(`Script execution failed with code ${code}`, HttpStatusCodes.INTERNAL_SERVER_ERROR);
             }
         });
 
-        // Handling errors
         wpCliProcess.on('error', (err) => {
             console.error('Failed to start child process:', err);
             fs.appendFileSync(outputLogPath, `Failed to start child process: ${err}`);
             throw new DockerServiceException(`Failed to start child process: ${err}`, HttpStatusCodes.INTERNAL_SERVER_ERROR);
         });
     };
+
+    private handleError(error: any): HttpResponse {
+        if (error instanceof DockerServiceException) {
+            return { message: error.message, status: error.status };
+        } else {
+            return { message: 'Internal Server Error', status: 500 };
+        }
+    }
 }
 

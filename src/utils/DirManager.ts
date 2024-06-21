@@ -62,12 +62,12 @@ export default class DirManager {
     }
   }
 
-  public static async deleteFile(filePath: string): Promise<string> {
+  public static async deleteFile(filePath: string): Promise<boolean> {
     try {
       await fs.unlink(filePath);
-      return 'File deleted';
+      return true;
     } catch (error : any){
-      throw new Error(`Error deleting file: ${error.message}`);
+      return false;
     }
   }
 }
