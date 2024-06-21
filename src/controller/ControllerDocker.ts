@@ -2,20 +2,21 @@ import { Request, Response } from 'express';
 import { Controller, HttpResponse } from './ControllerInterface';
 import DockerService from '../service/DockerService';
 import HttpStatusCodes from '../utils/HttpStatusCode';
+import { GenerateRequestBody } from '../@type/global.d';
 
-interface GenerateRequestBody {
-  dirname: string;
-  username: string;
-  email: string;
-  wpPassword: string;
-  mysqlRootPassword: string;
-  mysqlUser: string;
-  mysqlPassword: string;
-  mysqlPort: number;
-  wpPort: number;
-  nameApiKey: string;
-  rules: string;
-}
+// interface GenerateRequestBody {
+//   dirname: string;
+//   username: string;
+//   email: string;
+//   wpPassword: string;
+//   wpPort: number;
+//   mysqlRootPassword: string;
+//   mysqlUser: string;
+//   mysqlPassword: string;
+//   mysqlPort: number;
+//   nameApiKey: string;
+//   rules: string;
+// }
 export default class DockerController implements Controller {
   public readonly ROUTE: Array<string>;
   private readonly _dockerService: DockerService;
@@ -38,22 +39,24 @@ export default class DockerController implements Controller {
 
 /**
  * @Mapping POST(/build/template)
- * Builds tamplete docker-compose container.
+ * Builds template docker-compose container.
  * @param {Request} request - The request object.
  * @param {Response} response - The response object.
  * @returns {Promise<void>}
  */
   public async createTemplate(request: Request, response: Response): Promise<void> {
     const requestBody = {
-      dirname: request.body.dirname,
+      dirname: request.body.dirname, // dirname = project name
       username: request.body.username,
       email: request.body.email,
       wpPassword: request.body.wp_psswd,
+      wpPort: request.body.wp_port,
+      wpHost: request.body.wp_host,
+      wpProjectName: request.body.wp_project_name,
       mysqlRootPassword: request.body.mysql_root_psswd,
       mysqlUser: request.body.mysql_user,
       mysqlPassword: request.body.mysql_psswd,
       mysqlPort: request.body.mysql_port,
-      wpPort: request.body.wp_port,
       nameApiKey: request.body.name_api_key,
       rules: request.body.rules
     } as GenerateRequestBody;
@@ -66,7 +69,6 @@ export default class DockerController implements Controller {
       .json({ message: error.message });
     }
   }
-
 
 /**
  * @Mapping GET(/build-app)
