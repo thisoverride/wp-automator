@@ -64,7 +64,6 @@ export default class DockerService {
             }
 
             const dockerEnvironmentVars = {
-                '%{INSTANCE_NUMBER}': '8765764reg',
                 '%{MYSQL_ROOT_PASSWORD}': requestBody.mysqlRootPassword.toString(),
                 '%{MYSQL_USER}': requestBody.mysqlUser.toString(),
                 '%{MYSQL_PASSWORD}': requestBody.wpPassword.toString(),
@@ -73,7 +72,7 @@ export default class DockerService {
             };
 
             const wpcliEnvironmentVars = {
-                '%{INSTANCE_NUMBER}': '8765764reg',
+                '%{MYSQL_ROOT_PASSWORD}': requestBody.mysqlRootPassword.toString(),
                 '%{WP_HOST}': requestBody.wpHost.toString(),
                 '%{WP_PORT}': requestBody.wpPort.toString(),
                 '%{WP_PROJECT_NAME}': requestBody.wpProjectName.toString(),
@@ -287,25 +286,21 @@ export default class DockerService {
         }
     }
 
-    private async executeBashScript(folderPath: string) {
+    private async executeBashScript(folderPath: string) : Promise<void> {
         const scriptPath = `${folderPath}/wpcli_setup.sh`;
-
-        // const absoluteScriptPath = path.resolve(scriptPath);
-        // console.log(`Absolute script path: ${absoluteScriptPath}`);
-        // Define log file paths
         const outputLogPath = `${folderPath}/wpcli_output.log`;
-        // Vérifiez si le script existe
+
         if (!DirManager.folderExists(scriptPath)) {
             const errorMessage = `Script not found: ${scriptPath}`;
             console.error(errorMessage);
-            return new DockerServiceException(errorMessage, HttpStatusCodes.NOT_FOUND);
+            throw new DockerServiceException(errorMessage, HttpStatusCodes.NOT_FOUND);
         }
         if (!DirManager.verifyFilePermission(folderPath, 755)) {
             try {
                 fs.chmodSync(scriptPath, '755');
             } catch (chmodError) {
                 console.error('Failed to set script as executable:', chmodError);
-                return new DockerServiceException('Failed to set script as executable : \n' + chmodError, HttpStatusCodes.INTERNAL_SERVER_ERROR);
+                throw new DockerServiceException('Failed to set script as executable : \n' + chmodError, HttpStatusCodes.INTERNAL_SERVER_ERROR);
             }
         }
 
@@ -328,9 +323,11 @@ export default class DockerService {
             if (code === 0) {
                 console.log('Script execution completed successfully.');
                 fs.appendFileSync(outputLogPath, 'Script execution completed successfully.');
+                DirManager.deleteFile(scriptPath);
             } else {
-                console.error(`Script execution failed with code ${code}`);
                 fs.appendFileSync(outputLogPath, `Script execution failed with code ${code}`);
+                console.error(`Script execution failed with code ${code}`);
+                throw new DockerServiceException(`Script execution failed with code ${code}`, HttpStatusCodes.INTERNAL_SERVER_ERROR);
             }
         });
 
@@ -338,6 +335,7 @@ export default class DockerService {
         wpCliProcess.on('error', (err) => {
             console.error('Failed to start child process:', err);
             fs.appendFileSync(outputLogPath, `Failed to start child process: ${err}`);
+            throw new DockerServiceException(`Failed to start child process: ${err}`, HttpStatusCodes.INTERNAL_SERVER_ERROR);
         });
     };
 }
