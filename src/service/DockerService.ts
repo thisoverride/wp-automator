@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'path'
 import { HttpStatusCodes, DirManager } from '../utils/Utils'
-import Dockerode, { ContainerInfo, ContainerInspectInfo, ImageInfo } from 'dockerode';
+import Dockerode, { ContainerInfo, ContainerInspectInfo, ContainerListOptions, ImageInfo } from 'dockerode';
 import { v2 as compose } from 'docker-compose'
 import DockerServiceException from '../core/exception/DockerServiceException';
 import { HttpResponse } from '../controller/ControllerInterface';
@@ -132,7 +132,10 @@ export default class DockerService {
 
     public async getContainersInfos(): Promise<HttpResponse> {
         try {
-            const containerInfo: ContainerInfo[] = await this._docker.listContainers();
+            const option: ContainerListOptions = { 
+                all: true
+            }
+            const containerInfo: ContainerInfo[] = await this._docker.listContainers(option);
             return { message: containerInfo, status: 200 };
         } catch (error) {
             return this.handleError(error);
