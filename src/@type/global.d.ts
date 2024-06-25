@@ -12,4 +12,10 @@ export interface GenerateRequestBody {
   mysqlPort: number;
   nameApiKey: string;
   rules: string;
+  addons: Array<Addons>
+}
+
+export interface Addons {
+  name: string;
+  slug: string;
 }

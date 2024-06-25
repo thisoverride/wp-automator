@@ -54,8 +54,9 @@ else
 fi
 
 # Install and activate the WooCommerce plugin
-echo 'Installing WooCommerce...'
-wp plugin install woocommerce --activate --allow-root;
+echo 'Install addons...'
+wp plugin install %{ADDONS} --activate --allow-root;
+
 
 # Set the permalink structure
 echo 'Setting the permalink structure...'

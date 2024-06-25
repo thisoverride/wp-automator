@@ -7,7 +7,7 @@ import DockerServiceException from '../core/exception/DockerServiceException';
 import { HttpResponse } from '../controller/ControllerInterface';
 import { requestBodySchema } from '../framework/validator/schema'
 import { spawn } from 'node:child_process';
-import type { GenerateRequestBody } from '../@type/global';
+import type { Addons, GenerateRequestBody } from '../@type/global';
 
 export default class DockerService {
     private readonly _docker: Dockerode;
@@ -34,8 +34,6 @@ export default class DockerService {
                 throw new DockerServiceException
                     (`Le port ${requestBody.mysqlPort} est n'est pas disponible`, HttpStatusCodes.BAD_REQUEST);
             }
-
-
 
             const folderPath: string = path.join(DockerService.WP_SITES_DIR_PATH, requestBody.dirname);
             if (await DirManager.folderExists(folderPath)) {
@@ -80,17 +78,25 @@ export default class DockerService {
             };
 
             const dockerizedTemplate: string = DirManager.replaceTemplateFlags(DockerTemplateFile, dockerEnvironmentVars);
-            const wpcliTemplate: string = DirManager.replaceTemplateFlags(wpcliTemplateFile, wpcliEnvironmentVars);
+            let wpcliTemplate: string = DirManager.replaceTemplateFlags(wpcliTemplateFile, wpcliEnvironmentVars);
 
             if (await DirManager.createDir(folderPath)) {
                 if (!await DirManager.writeFile(folderPath + '/docker-compose.yml', dockerizedTemplate)) {
                     await DirManager.deleteDir(folderPath);
                     throw new DockerServiceException('Erreur lors de l\'écriture du fichier', HttpStatusCodes.INTERNAL_SERVER_ERROR);
                 }
+                
+                let addonScript = '';
+                for (const addonItem of requestBody.addons) {
+                    addonScript += `${addonItem.slug} `
+                }
+                wpcliTemplate = wpcliTemplate.replace('%{ADDONS}',addonScript);
+
                 if (!await DirManager.writeFile(folderPath + '/wpcli_setup.sh', wpcliTemplate)) {
                     await DirManager.deleteDir(folderPath);
                     throw new DockerServiceException('Erreur lors de l\'écriture du fichier', HttpStatusCodes.INTERNAL_SERVER_ERROR);
                 }
+                
             } else {
                 throw new DockerServiceException('Erreur lors de creation du dossier', HttpStatusCodes.INTERNAL_SERVER_ERROR);
             }
@@ -313,6 +319,7 @@ export default class DockerService {
     };
 
     private handleError(error: any): HttpResponse {
+        console.log(error)
         if (error instanceof DockerServiceException) {
             return { message: error.message, status: error.status };
         } else {

@@ -45,7 +45,8 @@ export default class DockerController implements Controller {
       mysqlPassword: request.body.mysql_psswd,
       mysqlPort: request.body.mysql_port,
       nameApiKey: request.body.name_api_key,
-      rules: request.body.rules
+      rules: request.body.rules,
+      addons : request.body.addons
     } as GenerateRequestBody;
     
     try {
