@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  swiftwordpress:
+    build: .
+    command: sh -c "yarn install && yarn dev"
+    ports:
+      - "8002:8002"
+    volumes:
+      - .:/usr/src/swiftwordpress
+      - /usr/src/poster_app/node_modules
