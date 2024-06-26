@@ -19,7 +19,8 @@ export default class DockerController implements Controller {
       '@POST(/containers/:id/stop,stopContainer)',
       '@POST(/containers/:app_name/stop-compose, stopCompose)',
       '@POST(/containers/:app_name/start-compose, startCompose)',
-      '@POST(/containers/:id/remove,removeContainer)'
+      '@POST(/containers/:id/remove,removeContainer)',
+      '@POST(/containers/:app_name/remove-all,removeContainerAssosiate)'
     ];
   }
 
@@ -200,6 +201,25 @@ export default class DockerController implements Controller {
     const { id } = request.params;
     try {
       const { status, message }: HttpResponse = await this._dockerService.destroyContainer(id);
+      response.status(status).json({ message: message });
+    } catch (error: any) {
+      response.status(error.status || HttpStatusCodes.INTERNAL_SERVER_ERROR)
+      .json({ message: error.message });
+    }
+  }
+
+
+  /**
+   * @Mapping POST(/containers/:app_name/remove)
+   * Remove all Docker container project .
+   * @param {Request} request - The request object.
+   * @param {Response} response - The response object.
+   * @returns {Promise<void>}
+   */
+  public async removeContainerAssosiate(request: Request, response: Response): Promise<void> {
+    const { app_name } = request.params;
+    try {
+      const { status, message }: HttpResponse = await this._dockerService.removeContainersAndVolumes(app_name);
       response.status(status).json({ message: message });
     } catch (error: any) {
       response.status(error.status || HttpStatusCodes.INTERNAL_SERVER_ERROR)
