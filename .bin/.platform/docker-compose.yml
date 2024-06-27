@@ -14,7 +14,7 @@ services:
     volumes:
       - ./wp:/var/www/html
     labels:
-      com.example.service_id: "This label will appear on the web service"
+      com.docker.compose.project : "%{PROJECT_NAME}"
 
   db:
     image: mysql:latest
@@ -28,7 +28,7 @@ services:
     ports:
       - "%{DB_PORT}:3306"
     labels:
-      com.example.service_id: "This label will appear on the db service"
+      com.docker.compose.project : "%{PROJECT_NAME}"
 
   wpcli:
     image: wordpress:cli
@@ -42,6 +42,11 @@ services:
     depends_on:
       - db
       - wordpress
+    labels:
+      com.docker.compose.project: "%{PROJECT_NAME}"
 
 volumes:
   db:
+    labels:
+      com.docker.compose.project: "%{PROJECT_NAME}"
+

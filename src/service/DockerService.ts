@@ -7,7 +7,7 @@ import DockerServiceException from '../core/exception/DockerServiceException';
 import { HttpResponse } from '../controller/ControllerInterface';
 import { requestBodySchema } from '../framework/validator/schema'
 import { spawn } from 'node:child_process';
-import type { Addons, GenerateRequestBody } from '../@type/global';
+import type { GenerateRequestBody } from '../@type/global';
 
 export default class DockerService {
     private readonly _docker: Dockerode;
@@ -64,7 +64,8 @@ export default class DockerService {
                 '%{MYSQL_USER}': requestBody.mysqlUser.toString(),
                 '%{MYSQL_PASSWORD}': requestBody.wpPassword.toString(),
                 '%{DB_PORT}': requestBody.mysqlPort.toString(),
-                '%{WP_PORT}': requestBody.wpPort.toString()
+                '%{WP_PORT}': requestBody.wpPort.toString(),
+                '%{PROJECT_NAME}': requestBody.dirname.toString(),
             };
 
             const wpcliEnvironmentVars = {
@@ -138,10 +139,7 @@ export default class DockerService {
 
     public async getContainersInfos(): Promise<HttpResponse> {
         try {
-            const option: ContainerListOptions = { 
-                all: true
-            }
-            const containerInfo: ContainerInfo[] = await this._docker.listContainers(option);
+            const containerInfo: ContainerInfo[] = await this._docker.listContainers({ all: true });
             return { message: containerInfo, status: 200 };
         } catch (error) {
             return this.handleError(error);
@@ -168,6 +166,55 @@ export default class DockerService {
             return this.handleError(error);
         }
     }
+
+    public async removeContainersAndVolumes(appName: string): Promise<HttpResponse> {
+        try {
+            const folderPath: string = path.join(DockerService.WP_SITES_DIR_PATH, appName);
+    
+            if (!fs.existsSync(folderPath)) {
+                throw new DockerServiceException(
+                    `Le projet ${appName} n'existe pas.`,
+                    HttpStatusCodes.NOT_FOUND
+                );
+            }
+    
+            const composeConfig = path.join(folderPath, 'docker-compose.yml');
+    
+            if (!fs.existsSync(composeConfig)) {
+                throw new DockerServiceException(
+                    `Fichier docker-compose.yml introuvable pour le projet ${appName}.`,
+                    HttpStatusCodes.NOT_FOUND
+                );
+            }
+            await compose.down({ cwd: folderPath, log: true }); 
+            const containers: ContainerInfo[] = await this._docker.listContainers({ all: true }); 
+            const projectContainers = containers.filter(container =>
+                container.Labels['com.docker.compose.project'] === appName
+            );
+    
+            for (const containerInfo of projectContainers) {
+                const container = this._docker.getContainer(containerInfo.Id);
+                await container.remove({ force: true });
+            }
+    
+
+            const volumes = await this._docker.listVolumes();
+            const projectVolumes = volumes.Volumes.filter(volume =>
+                volume.Labels && volume.Labels['com.docker.compose.project'] === appName
+            );
+
+            for (const volumeInfo of projectVolumes) {
+                const volume = this._docker.getVolume(volumeInfo.Name);
+                await volume.remove();
+            }
+    
+            return { message: `Tous les conteneurs et volumes associés à ${appName} ont été supprimés avec succès.`, 
+            status: HttpStatusCodes.OK };
+        } catch (error: any) {
+            return this.handleError(error);
+        }
+    }
+    
 
 
     public async stopDockerCompose(appName: string): Promise<HttpResponse> {
