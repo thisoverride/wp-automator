@@ -23,8 +23,6 @@ export default class ApiKeyRepository {
       }
   }
 
-
-
   public async delete(id: number): Promise<number> {
       try {
           const options: DestroyOptions = {

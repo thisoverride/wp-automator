@@ -16,7 +16,6 @@ def check_ports_in_range(start, end, max_workers=100):
                 available_ports.append(port)
     return available_ports
 
-# Example usage: Check all ports from 1 to 65535
 if __name__ == '__main__':
     available_ports = check_ports_in_range(2000, 8100)
-    print('Available ports:', available_ports)
+    print(available_ports)
