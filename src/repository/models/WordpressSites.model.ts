@@ -1,5 +1,5 @@
 // models/WordpressSites.ts
-import { Model, Table, Column, DataType } from 'sequelize-typescript';
+import { Model, Table, Column, DataType, Unique } from 'sequelize-typescript';
 import { WordpressSitesAttributes } from '../../@type/repository/models/Models';
 
 
@@ -11,6 +11,7 @@ import { WordpressSitesAttributes } from '../../@type/repository/models/Models';
     schema: 'wpswift_dev'
 })
 export default class WordpressSites extends Model<WordpressSitesAttributes> {
+    @Unique(true)
     @Column({ allowNull: false })
     app_name!: string;
 
@@ -20,3 +21,6 @@ export default class WordpressSites extends Model<WordpressSitesAttributes> {
     @Column({ allowNull: false, defaultValue: 'created' })
     status!: string;
 }
+
+
+

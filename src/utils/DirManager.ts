@@ -9,7 +9,7 @@ export default class DirManager {
       return false;
     }
   }
-  
+
   public static async readfile(templatePath: string): Promise<string | null> {
     try {
       const data = await fs.readFile(templatePath, 'utf8');
@@ -62,11 +62,38 @@ export default class DirManager {
     }
   }
 
+  public static async changeFilePermission(filePath: string, permission: number): Promise<boolean> {
+    try {
+      await fs.chmod(filePath, permission);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   public static async deleteFile(filePath: string): Promise<boolean> {
     try {
       await fs.unlink(filePath);
       return true;
-    } catch (error : any){
+    } catch (error: any) {
+      return false;
+    }
+  }
+
+  public static async copyFile(source: string, destination: string): Promise<boolean> {
+    try {
+      await fs.copyFile(source, destination);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  public static async createFile(file: string, data: string): Promise<boolean> {
+    try {
+      await fs.writeFile(file, data, 'utf8');
+      return true;
+    } catch {
       return false;
     }
   }

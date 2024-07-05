@@ -7,7 +7,7 @@ attempt_counter_db=0
 max_attempts=10
 
 # Wait for the database to become available
-until docker-compose exec db mysqladmin ping -h "db" -u root -p%{MYSQL_ROOT_PASSWORD} --silent > /dev/null 2>&1; do
+until docker-compose exec db mysqladmin ping -h "db" -u root -p${MYSQL_ROOT_PASSWORD} --silent > /dev/null 2>&1; do
   attempt_counter_db=$((attempt_counter_db + 1))
   echo "Waiting for the database to become available... Attempt $attempt_counter_db of $max_attempts"
   
@@ -50,13 +50,13 @@ docker-compose run --rm --user="root" wpcli bash -c "
       echo 'WordPress is already installed.'
     else
       echo 'Installing WordPress...'
-      wp core install --path='/var/www/html' --url='http://%{WP_HOST}:%{WP_PORT}' --title='%{WP_PROJECT_NAME}' --admin_user='%{WP_USER}' --admin_password='%{WP_PASSWORD}' --admin_email='%{WP_EMAIL}' --allow-root;
+      wp core install --path='/var/www/html' --url='http://${WP_HOST}:${WP_PORT}' --title='${WP_PROJECT_NAME}' --admin_user='${WP_USER}' --admin_password='${WP_PASSWORD}' --admin_email='${WP_EMAIL}' --allow-root;
     fi
 
     # Language setup
     echo 'Setting up the language...'
-    wp language core install %{WP_LANGUAGE} --allow-root;
-    wp language core activate %{WP_LANGUAGE} --allow-root;
+    wp language core install ${WP_LANGUAGE} --allow-root;
+    wp language core activate ${WP_LANGUAGE} --allow-root;
 
     # Install and activate the WooCommerce plugin
     echo 'Install addons...'
@@ -73,7 +73,7 @@ docker-compose run --rm --user="root" wpcli bash -c "
 
 docker-compose exec wordpress bash -c '
   chmod 644 ./wp-config.php && \
-  echo "define('\''JWT_AUTH_SECRET_KEY'\'', '\''%{SECRET_KEY}'\'');" >> ./wp-config.php && \
+  echo "define('\''JWT_AUTH_SECRET_KEY'\'', '\''${SECRET_KEY}'\'');" >> ./wp-config.php && \
   chmod 444 ./wp-config.php;
 
   chown -R www-data:www-data /var/www/html;

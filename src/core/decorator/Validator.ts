@@ -5,7 +5,7 @@ import DirManager from "../../utils/DirManager";
 import HttpStatusCodes from "../../utils/HttpStatusCode";
 import DockerServiceException from "../exception/DockerServiceException";
 import { GenerateRequestBody } from "../../@type/global";
-import ExternalServiceManager from "../../manager/ExternalServiceManager";
+import { Tools } from '../../utils/Utils'
 
 export const ValidateBody = (target: any, propertyName: string, descriptor: PropertyDescriptor) => {
   const method = descriptor.value;
@@ -18,7 +18,7 @@ export const ValidateBody = (target: any, propertyName: string, descriptor: Prop
           throw new DockerServiceException(`${error.stack}`, HttpStatusCodes.BAD_REQUEST);
       }
   
-      const availablePort = await ExternalServiceManager.executeScript('python3',path.join('.bin/check_all_available_ports.py'));
+      const availablePort = await Tools.executeScript('python3',path.join('.bin/check_all_available_ports.py'));
       const portRegex: RegExp = /\d+/g;
       const matchResult: RegExpMatchArray | null = availablePort.result.match(portRegex);
       

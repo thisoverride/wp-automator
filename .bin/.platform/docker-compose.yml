@@ -5,37 +5,37 @@ services:
       - db
     image: wordpress:latest
     ports:
-      - "%{WP_PORT}:80"
+      - ${WP_PORT}:80
     environment:
       WORDPRESS_DB_HOST: db
-      WORDPRESS_DB_USER: "%{MYSQL_USER}"
-      WORDPRESS_DB_PASSWORD: "%{MYSQL_PASSWORD}"
+      WORDPRESS_DB_USER: ${MYSQL_USER}
+      WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
       WORDPRESS_DB_NAME: "wordpress"
     volumes:
       - wp:/var/www/html
     labels:
-      com.docker.compose.project : "%{PROJECT_NAME}"
+      com.docker.compose.project: ${PROJECT_NAME}
 
   db:
     image: mysql:latest
     environment:
-      MYSQL_DATABASE: "wordpress"
-      MYSQL_USER: "%{MYSQL_USER}"
-      MYSQL_PASSWORD: "%{MYSQL_PASSWORD}"
-      MYSQL_ROOT_PASSWORD: "%{MYSQL_ROOT_PASSWORD}"
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     volumes:
       - db:/var/lib/mysql
     ports:
-      - "%{DB_PORT}:3306"
+      - ${DB_PORT}:3306
     labels:
-      com.docker.compose.project : "%{PROJECT_NAME}"
+      com.docker.compose.project: ${PROJECT_NAME}
 
   wpcli:
     image: wordpress:cli
     environment:
       WORDPRESS_DB_HOST: db
-      WORDPRESS_DB_USER: "%{MYSQL_USER}"
-      WORDPRESS_DB_PASSWORD: "%{MYSQL_PASSWORD}"
+      WORDPRESS_DB_USER: ${MYSQL_USER}
+      WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
       WORDPRESS_DB_NAME: "wordpress"
     volumes:
       - wp:/var/www/html
@@ -43,13 +43,12 @@ services:
       - db
       - wordpress
     labels:
-      com.docker.compose.project: "%{PROJECT_NAME}"
+      com.docker.compose.project: ${PROJECT_NAME}
 
 volumes:
   db:
     labels:
-      com.docker.compose.project: "%{PROJECT_NAME}"
+      com.docker.compose.project: ${PROJECT_NAME}
   wp:
     labels:
-      com.docker.compose.project: "%{PROJECT_NAME}"
-
+      com.docker.compose.project: ${PROJECT_NAME}

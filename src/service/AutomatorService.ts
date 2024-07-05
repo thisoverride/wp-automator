@@ -1,10 +1,13 @@
 import puppeteer, { Browser, Page } from 'puppeteer';
+import locateChrome from 'locate-chrome';
 
-export default class ApiKeyService {
-    public async generateApiKey(host: string, wpcredentials : {wpUsr: string ,wpPsswd: string}) {
+export default class AutomatorService {
+  public async generateApiKey(host: string, wpcredentials : {wpUsr: string ,wpPsswd: string}) {
+      const executable_path = await new Promise(resolve => locateChrome((arg) => resolve(arg))) || '';
+      
       const log = console.log;
       log(wpcredentials)
-      const browser: Browser = await puppeteer.launch({headless : false});
+      const browser: Browser = await puppeteer.launch({  executablePath : executable_path.toString()});
       const page: Page = await browser.newPage();
     
       log('Navigating to WordPress login page...');
@@ -19,7 +22,8 @@ export default class ApiKeyService {
       await page.type('#user_login', wpcredentials.wpUsr);
       await page.type('#user_pass', wpcredentials.wpPsswd);
       await page.click('#wp-submit'); 
-    
+     
+
       log('Waiting for dashboard after login...');
       await page.waitForNavigation({ waitUntil: "networkidle2" });
     
