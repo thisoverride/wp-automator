@@ -1,12 +1,9 @@
 import fs from 'node:fs';
 import path from 'path'
+import Dockerode, { ContainerInfo, Volume, VolumeInspectInfo } from 'dockerode';
 import { HttpStatusCodes, DirManager, Tools } from '../utils/Utils'
-import Dockerode, { ContainerInfo, ContainerInspectInfo, ContainerListOptions, ImageInfo } from 'dockerode';
-import { v2 as compose } from 'docker-compose'
 import DockerServiceException from '../core/exception/DockerServiceException';
 import { HttpResponse } from '../controller/ControllerInterface';
-import { requestBodySchema } from '../framework/validator/schema'
-import { spawn } from 'node:child_process';
 import type { GenerateRequestBody } from '../@type/global';
 import sha256 from 'crypto-js/sha256';
 import WordpressSitesRepository from '../repository/dao/WordpressSitesRepository';
@@ -14,6 +11,10 @@ import WordpressSites from '../repository/models/WordpressSites.model';
 import UserRepository from '../repository/dao/UserRepository';
 import ApiKeyRepository from '../repository/dao/ApiKeyRepository';
 import ApiKeyService from './ApiKeyService';
+import DockerManager from '../manager/DockerManager';
+import { ValidateBody } from '../core/decorator/Validator';
+import ExternalServiceManager from '../manager/ExternalServiceManager'
+
 
 
 export default class DockerService {
@@ -22,7 +23,8 @@ export default class DockerService {
     private readonly _userRepository: UserRepository;
     private readonly _apiKeyRepository: ApiKeyRepository;
     private readonly _apiKeyService: ApiKeyService;
-    private static readonly WP_SITES_DIR_PATH: string = path.join(__dirname, '..', '..', '..', '/wp-sites/');
+    private readonly _dockerManager: DockerManager;
+    public static readonly WP_SITES_DIR_PATH: string = path.join(__dirname, '..', '..', '..', '/wp-sites/');
 
     public constructor(
         dockernode: Dockerode, 
@@ -36,35 +38,13 @@ export default class DockerService {
         this._userRepository = userRepository;
         this._apiKeyRepository = apiKeyRepository;
         this._apiKeyService = ApiKeyService
+        this._dockerManager = new DockerManager(dockernode);
     }
 
+    @ValidateBody
     public async buildTemplate(requestBody: GenerateRequestBody): Promise<HttpResponse> {
-        
         try {
-            const { error } = requestBodySchema.validate(requestBody);
-            if (error) {
-                throw new DockerServiceException(
-                    `${error.stack}`, HttpStatusCodes.BAD_REQUEST);
-            }
-            const availablePort = await this.executePythonScript() as any;
-
-            if (!availablePort.ports.includes(parseInt(requestBody.wpPort.toString()))) {
-                throw new DockerServiceException
-                    (`Le port ${requestBody.wpPort} est n'est pas disponible`, HttpStatusCodes.BAD_REQUEST);
-            }
-            if (!availablePort.ports.includes(parseInt(requestBody.mysqlPort.toString()))) {
-                throw new DockerServiceException
-                    (`Le port ${requestBody.mysqlPort} est n'est pas disponible`, HttpStatusCodes.BAD_REQUEST);
-            }
-
             const folderPath: string = path.join(DockerService.WP_SITES_DIR_PATH, requestBody.dirname);
-            if (await DirManager.folderExists(folderPath)) {
-                throw new DockerServiceException(
-                    `Le projet "${requestBody.dirname}" ne peut pas être créé car il existe déjà.`,
-                    HttpStatusCodes.BAD_REQUEST
-                );
-            }
-
             let dockerTemplatePath: string = path.join(__dirname, '..', '..', '.bin', '.platform', 'docker-compose.yml');
             const DockerTemplateFile = await DirManager.readfile(dockerTemplatePath);
 
@@ -72,13 +52,12 @@ export default class DockerService {
             const wpcliTemplateFile = await DirManager.readfile(wpcliTamplatePath);
 
             if (!DockerTemplateFile) {
-                throw new DockerServiceException
-                    (`Impossible de localiser la source ${dockerTemplatePath}`, HttpStatusCodes.NOT_FOUND);
+                throw new DockerServiceException(`Impossible de localiser la source ${dockerTemplatePath}`, 
+                    HttpStatusCodes.NOT_FOUND);
             }
-
             if (!wpcliTemplateFile) {
-                throw new DockerServiceException
-                    (`Impossible de localiser la source ${wpcliTamplatePath}`, HttpStatusCodes.NOT_FOUND);
+                throw new DockerServiceException(`Impossible de localiser la source ${wpcliTamplatePath}`,
+                    HttpStatusCodes.NOT_FOUND);
             }
 
             const dockerEnvironmentVars = {
@@ -110,8 +89,8 @@ export default class DockerService {
                     await DirManager.deleteDir(folderPath);
                     throw new DockerServiceException('Erreur lors de l\'écriture du fichier', HttpStatusCodes.INTERNAL_SERVER_ERROR);
                 }
-
-                let addonScript = '';
+                
+                let addonScript: string = '';
                 for (const addonItem of requestBody.addons) {
                     addonScript += `${addonItem.slug} `
                 }
@@ -121,7 +100,7 @@ export default class DockerService {
                     await DirManager.deleteDir(folderPath);
                     throw new DockerServiceException('Erreur lors de l\'écriture du fichier', HttpStatusCodes.INTERNAL_SERVER_ERROR);
                 }
-
+     
                const app =  await this._wordpressSitesRepository.create({
                     app_name: requestBody.wpProjectName,
                     url: `${requestBody.wpHost}:${requestBody.wpPort}` ,
@@ -152,9 +131,8 @@ export default class DockerService {
             const dockerComposePath: string = path.join(folderPath, 'docker-compose.yml');
 
             if (!fs.existsSync(dockerComposePath)) {
-                throw new DockerServiceException
-                    (`Ce projet ne contient pas de modèle de configuration Docker (docker-compose.yml)`,
-                        HttpStatusCodes.NOT_FOUND);
+                throw new DockerServiceException(`Ce projet ne contient pas de modèle de configuration Docker (docker-compose.yml)`,
+                    HttpStatusCodes.NOT_FOUND);
             }
             this.runBuildProcess(folderPath,appName);
 
@@ -166,7 +144,6 @@ export default class DockerService {
 
     private async runBuildProcess(folderPath: string, appName: string): Promise<void> {
         let applicationWp: WordpressSites | null = null;
-    
         try {
             applicationWp = await this._wordpressSitesRepository.findByName(appName);
     
@@ -175,18 +152,14 @@ export default class DockerService {
             }
     
             await this._wordpressSitesRepository.updateStatus(applicationWp.id, 'pulling')
-            await compose.pullAll({ cwd: folderPath, log: true });
-
-  
-            await this._wordpressSitesRepository.updateStatus(applicationWp.id, 'mount')
-            await compose.upAll({ cwd: folderPath, log: true });
+            await this._dockerManager.composePull(folderPath);
+           
+            await this._wordpressSitesRepository.updateStatus(applicationWp.id, 'mount');
+            await this._dockerManager.composeUp(folderPath);
             
-            await this._wordpressSitesRepository.updateStatus(applicationWp.id, 'generate_apikey')
+            await this._wordpressSitesRepository.updateStatus(applicationWp.id, 'instalation');
             await this.executeBashScript(folderPath, applicationWp.id);
 
-
-    
-    
         } catch (error) {
             console.error('Error in build process:', error);
             if (applicationWp && applicationWp.id) {
@@ -198,18 +171,27 @@ export default class DockerService {
 
     public async getContainersInfos(): Promise<HttpResponse> {
         try {
-            const containerInfo: ContainerInfo[] = await this._docker.listContainers({ all: true });
-            return { message: containerInfo, status: 200 };
+            const containerInfo = await this._dockerManager.getContainersInfos();
+            return { message: containerInfo, status: HttpStatusCodes.OK };
         } catch (error) {
             return this.handleError(error);
         }
     }
- 
+
     public async getImagesInfos(): Promise<HttpResponse> {
         try {
-            const imagesInfo: ImageInfo[] = await this._docker.listImages();
-            return { message: imagesInfo, status: 200 };
+            const imagesInfo = await this._dockerManager.getImagesInfos();
+            return { message: imagesInfo, status: HttpStatusCodes.OK };
         } catch (error) {
+            return this.handleError(error);
+        }
+    }
+
+    public async destroyContainer(containerId: string): Promise<HttpResponse> {
+        try {
+            await this._dockerManager.removeContainer(containerId);
+            return { message: `Container ${containerId} is removed successfully.`, status: HttpStatusCodes.OK };
+        } catch (error: any) {
             return this.handleError(error);
         }
     }
@@ -217,8 +199,7 @@ export default class DockerService {
     public async startDockerCompose(appName: string): Promise<HttpResponse> {
         try {
             const folderPath: string = path.join(DockerService.WP_SITES_DIR_PATH, appName);
-            await compose.upAll({ cwd: folderPath, log: true })
-
+            await this._dockerManager.composeUp(folderPath)
             return { message: `Docker Compose for ${appName} started successfully.`, status: HttpStatusCodes.OK };
         } catch (error: any) {
             return this.handleError(error);
@@ -230,24 +211,20 @@ export default class DockerService {
             const folderPath: string = path.join(DockerService.WP_SITES_DIR_PATH, appName);
             let message = '';
             if (!fs.existsSync(folderPath)) {
-                throw new DockerServiceException(
-                    `Le projet ${appName} n'existe pas.`,
-                    HttpStatusCodes.NOT_FOUND
-                );
+                throw new DockerServiceException(`Le projet ${appName} n'existe pas.`,HttpStatusCodes.NOT_FOUND);
             }
-
-            const composeConfig = path.join(folderPath, 'docker-compose.yml');
-
+          
+            const composeConfig: string = path.join(folderPath, 'docker-compose.yml');
             if (!fs.existsSync(composeConfig)) {
-                throw new DockerServiceException(
-                    `Fichier docker-compose.yml introuvable pour le projet ${appName}.`,
+                throw new DockerServiceException(`Fichier docker-compose.yml introuvable pour le projet ${appName}.`,
                     HttpStatusCodes.NOT_FOUND
                 );
             }
 
-            await compose.down({ cwd: folderPath, log: true });
-            const containers: ContainerInfo[] = await this._docker.listContainers({ all: true });
-            const projectContainers = containers.filter(container =>
+            await this._dockerManager.composeDown(folderPath)
+            const containers: ContainerInfo[] = await this._dockerManager.getContainersInfos(); 
+            const projectContainers: ContainerInfo[] = containers.filter(container =>
+
                 container.Labels['com.docker.compose.project'] === appName
             );
 
@@ -256,14 +233,13 @@ export default class DockerService {
                 await container.remove({ force: true });
             }
 
-
             const volumes = await this._docker.listVolumes();
-            const projectVolumes = volumes.Volumes.filter(volume =>
+            const projectVolumes: VolumeInspectInfo[] = volumes.Volumes.filter(volume =>
                 volume.Labels && volume.Labels['com.docker.compose.project'] === appName
             );
 
             for (const volumeInfo of projectVolumes) {
-                const volume = this._docker.getVolume(volumeInfo.Name);
+                const volume: Volume = this._docker.getVolume(volumeInfo.Name);
                 await volume.remove();
             }
             message = `Tous les conteneurs et volumes associés à ${appName} ont été supprimés avec succès.`;
@@ -288,14 +264,14 @@ export default class DockerService {
         }
     }
 
+
     public async stopDockerCompose(appName: string): Promise<HttpResponse> {
         try {
             const folderPath: string = path.join(DockerService.WP_SITES_DIR_PATH, appName);
             if (!fs.existsSync(folderPath)) throw new DockerServiceException
                 (`Le conteneur ${appName} n'existe pas.`, HttpStatusCodes.NOT_FOUND);
-
-            await compose.downAll({ cwd: folderPath, log: true });
-
+                await this._dockerManager.composeDown(folderPath);
+            
             return { message: `Docker Compose for ${appName} stopped successfully.`, status: HttpStatusCodes.OK };
         } catch (error: any) {
             return this.handleError(error);
@@ -305,15 +281,10 @@ export default class DockerService {
 
     public async runContainer(containerId: string): Promise<HttpResponse> {
         try {
-            const container = this._docker.getContainer(containerId.toString());
-            const containerInfo: ContainerInspectInfo = await container.inspect();
-
-            if (containerInfo.State.Running) {
-                throw new DockerServiceException
-                    ('Container already started', HttpStatusCodes.BAD_REQUEST);
+            const status: boolean = await this._dockerManager.runContainer(containerId.toString());
+            if (status) {
+                throw new DockerServiceException('Container already started', HttpStatusCodes.BAD_REQUEST);
             }
-            await container.start();
-
             return { message: `Container ${containerId} begin started successfully.`, status: HttpStatusCodes.OK };
         } catch (error: any) {
             return this.handleError(error);
@@ -322,75 +293,20 @@ export default class DockerService {
 
     public async stopContainer(containerId: string): Promise<HttpResponse> {
         try {
-            const container = this._docker.getContainer(containerId);
-            const containerInfo: ContainerInspectInfo = await container.inspect();
-
-            if (!containerInfo.State.Running) throw new DockerServiceException
-                ('Container is not running', HttpStatusCodes.BAD_REQUEST);
-            await container.stop();
-
+            const status: boolean = await this._dockerManager.stopContainer(containerId.toString());
+            if (!status) {
+                throw new DockerServiceException('Container is not running', HttpStatusCodes.BAD_REQUEST);
+            } 
             return { message: `Container ${containerId} stopped successfully.`, status: HttpStatusCodes.OK };
         } catch (error: any) {
             return this.handleError(error);
         }
     }
 
-    public async destroyContainer(containerId: string): Promise<HttpResponse> {
-        try {
-            const container = this._docker.getContainer(containerId);
-            await container.remove();
-            return { message: `Container ${containerId} is removed successfully.`, status: HttpStatusCodes.OK };
-        } catch (error: any) {
-            return this.handleError(error);
-        }
-    }
-
-    private async executePythonScript() {
-        return new Promise((resolve, reject) => {
-            const pythonProcess = spawn('python3', [path.join(__dirname, '..', '..', '.bin', 'check_all_available_ports.py')]);
-
-            let stdoutData = '';
-            let stderrData = '';
-
-            pythonProcess.stdout.on('data', (data) => {
-                stdoutData += data;
-            });
-
-            pythonProcess.stderr.on('data', (data) => {
-                stderrData += data;
-            });
-
-            pythonProcess.on('close', (code) => {
-                if (code === 0) {
-                    if (stdoutData !== null && stdoutData !== undefined) {
-                        const portRegex = /\d+/g;
-                        const matchResult = stdoutData.match(portRegex);
-
-                        if (matchResult !== null) {
-                            const portsArray = matchResult.map(Number);
-                            resolve({ ports: portsArray, stderr: stderrData });
-                        } else {
-                            reject('No ports found in the output');
-                        }
-                    } else {
-                        reject('No output received from the Python script');
-                    }
-                } else {
-                    reject(`Python script execution failed with code ${code}`);
-                }
-            });
-
-            pythonProcess.on('error', (err) => {
-                reject(`Failed to execute Python script: ${err}`);
-            });
-        });
-    }
-
 
 
     private async executeBashScript(folderPath: string,id: number) : Promise<void> {
         const scriptPath = `${folderPath}/wpcli_setup.sh`;
-        const outputLogPath = `${folderPath}/wpcli_output.log`;
 
         if (!DirManager.folderExists(scriptPath)) {
             const errorMessage = `Script not found: ${scriptPath}`;
@@ -402,55 +318,24 @@ export default class DockerService {
                 fs.chmodSync(scriptPath, '755');
             } catch (chmodError) {
                 console.error('Failed to set script as executable:', chmodError);
-                throw new DockerServiceException('Failed to set script as executable : \n' + chmodError, HttpStatusCodes.INTERNAL_SERVER_ERROR);
+                throw new DockerServiceException('Failed to set script as executable : \n' + chmodError, 
+                    HttpStatusCodes.INTERNAL_SERVER_ERROR);
             }
         }
 
-        const wpCliProcess = spawn('sh', [scriptPath], { cwd: folderPath });
-
-        wpCliProcess.stdout.on('data', (data) => {
-            console.log(`${data}`);
-            fs.appendFileSync(outputLogPath, data);
-        });
-
-        wpCliProcess.stderr.on('data', (data) => {
-            console.error(`${data}`);
-            fs.appendFileSync(outputLogPath, data);
-        });
-
-        wpCliProcess.on('close', async (code) => {
-            if (code === 0) {
-                await this._wordpressSitesRepository.updateStatus(id, 'completed')
-                const app = await this._wordpressSitesRepository.findById(id)
-                if(app){
-                    const user = await this._userRepository.findByAppId(app.dataValues.id as any)
-                    console.log(user?.dataValues)
-                    
-                    const {consumer_key , secret_key } = await this._apiKeyService.generateApiKey(app.dataValues.url, 
-                        {wpUsr : user!.username, wpPsswd: user!.password})
-                        await this._apiKeyRepository.create({
-                            consumer_key: consumer_key,
-                            consumer_secret: secret_key,
-                        })
-
-                }
-                fs.appendFileSync(outputLogPath, 'Script execution completed successfully.');
-                if (!DirManager.deleteFile(scriptPath)) {
-                    throw new Error(`Error deleting file`);
-                }
-            } else {
-                fs.appendFileSync(outputLogPath, `Script execution failed with code ${code}`);
-                throw new DockerServiceException(`Script execution failed with code ${code}`, HttpStatusCodes.INTERNAL_SERVER_ERROR);
-            }
-        }); 
-
-        wpCliProcess.on('error', (err) => {
-            console.error('Failed to start child process:', err);
-            fs.appendFileSync(outputLogPath, `Failed to start child process: ${err}`);
-            throw new DockerServiceException(`Failed to start child process: ${err}`, HttpStatusCodes.INTERNAL_SERVER_ERROR);
-        });
-    };
-
+         await ExternalServiceManager.executeScript('sh',scriptPath,[],true,folderPath);
+         await this._wordpressSitesRepository.updateStatus(id, 'completed')
+         const app = await this._wordpressSitesRepository.findById(id)
+         
+         if(app){
+            const user = await this._userRepository.findByAppId(app.dataValues.id as any)
+            console.log(user?.dataValues)
+            const {consumer_key , secret_key } = await this._apiKeyService.generateApiKey(app.dataValues.url, 
+                         {wpUsr : user!.username, wpPsswd: user!.password})
+            await this._apiKeyRepository.create({ consumer_key: consumer_key, consumer_secret: secret_key})
+         };
+    }
+   
     private handleError(error: any): HttpResponse {
         console.log(error)
         if (error instanceof DockerServiceException) {
