@@ -9,19 +9,39 @@ import { requestBodySchema } from '../framework/validator/schema'
 import { spawn } from 'node:child_process';
 import type { GenerateRequestBody } from '../@type/global';
 import sha256 from 'crypto-js/sha256';
+import WordpressSitesRepository from '../repository/dao/WordpressSitesRepository';
+import WordpressSites from '../repository/models/WordpressSites.model';
+import UserRepository from '../repository/dao/UserRepository';
+import ApiKeyRepository from '../repository/dao/ApiKeyRepository';
+import ApiKeyService from './ApiKeyService';
 
 
 export default class DockerService {
     private readonly _docker: Dockerode;
+    private readonly _wordpressSitesRepository: WordpressSitesRepository;
+    private readonly _userRepository: UserRepository;
+    private readonly _apiKeyRepository: ApiKeyRepository;
+    private readonly _apiKeyService: ApiKeyService;
     private static readonly WP_SITES_DIR_PATH: string = path.join(__dirname, '..', '..', '..', '/wp-sites/');
 
-    public constructor(dockernode: Dockerode) {
+    public constructor(
+        dockernode: Dockerode, 
+        wordpressSitesRepository: WordpressSitesRepository,
+        userRepository : UserRepository,
+        apiKeyRepository : ApiKeyRepository, 
+        ApiKeyService: ApiKeyService
+    ) {
         this._docker = dockernode;
+        this._wordpressSitesRepository = wordpressSitesRepository;
+        this._userRepository = userRepository;
+        this._apiKeyRepository = apiKeyRepository;
+        this._apiKeyService = ApiKeyService
     }
 
     public async buildTemplate(requestBody: GenerateRequestBody): Promise<HttpResponse> {
+        
         try {
-            const { error, value } = requestBodySchema.validate(requestBody);
+            const { error } = requestBodySchema.validate(requestBody);
             if (error) {
                 throw new DockerServiceException(
                     `${error.stack}`, HttpStatusCodes.BAD_REQUEST);
@@ -102,6 +122,18 @@ export default class DockerService {
                     throw new DockerServiceException('Erreur lors de l\'écriture du fichier', HttpStatusCodes.INTERNAL_SERVER_ERROR);
                 }
 
+               const app =  await this._wordpressSitesRepository.create({
+                    app_name: requestBody.wpProjectName,
+                    url: `${requestBody.wpHost}:${requestBody.wpPort}` ,
+                    status: 'created' 
+                });
+                await this._userRepository.create({
+                    username : requestBody.username,
+                    email : requestBody.email,
+                    password: requestBody.wpPassword,
+                    type: 'none',
+                    wordpress_site_id : app.dataValues.id as any
+                });
             } else {
                 throw new DockerServiceException('Erreur lors de creation du dossier', HttpStatusCodes.INTERNAL_SERVER_ERROR);
             }
@@ -124,18 +156,43 @@ export default class DockerService {
                     (`Ce projet ne contient pas de modèle de configuration Docker (docker-compose.yml)`,
                         HttpStatusCodes.NOT_FOUND);
             }
-
-            await compose.pullAll({ cwd: folderPath, log: true });
-            console.log('Pulling finish');
-
-            await compose.upAll({ cwd: folderPath, log: true });
-            console.log('Application is running');
-
-            await this.executeBashScript(folderPath);
+            this.runBuildProcess(folderPath,appName);
 
             return { message: 'Lancement de la machine de build', status: HttpStatusCodes.OK };
         } catch (error) {
             return this.handleError(error);
+        }
+    }
+
+    private async runBuildProcess(folderPath: string, appName: string): Promise<void> {
+        let applicationWp: WordpressSites | null = null;
+    
+        try {
+            applicationWp = await this._wordpressSitesRepository.findByName(appName);
+    
+            if (!applicationWp) {
+                throw new Error(`WordpressSite with name ${appName} not found.`);
+            }
+    
+            await this._wordpressSitesRepository.updateStatus(applicationWp.id, 'pulling')
+            await compose.pullAll({ cwd: folderPath, log: true });
+
+  
+            await this._wordpressSitesRepository.updateStatus(applicationWp.id, 'mount')
+            await compose.upAll({ cwd: folderPath, log: true });
+            
+            await this._wordpressSitesRepository.updateStatus(applicationWp.id, 'generate_apikey')
+            await this.executeBashScript(folderPath, applicationWp.id);
+
+
+    
+    
+        } catch (error) {
+            console.error('Error in build process:', error);
+            if (applicationWp && applicationWp.id) {
+                applicationWp.status = 'failed'
+                await this._wordpressSitesRepository.updateStatus(applicationWp.id, 'failed')
+            } 
         }
     }
 
@@ -147,7 +204,7 @@ export default class DockerService {
             return this.handleError(error);
         }
     }
-
+ 
     public async getImagesInfos(): Promise<HttpResponse> {
         try {
             const imagesInfo: ImageInfo[] = await this._docker.listImages();
@@ -330,7 +387,8 @@ export default class DockerService {
     }
 
 
-    private async executeBashScript(folderPath: string): Promise<void> {
+
+    private async executeBashScript(folderPath: string,id: number) : Promise<void> {
         const scriptPath = `${folderPath}/wpcli_setup.sh`;
         const outputLogPath = `${folderPath}/wpcli_output.log`;
 
@@ -360,8 +418,22 @@ export default class DockerService {
             fs.appendFileSync(outputLogPath, data);
         });
 
-        wpCliProcess.on('close', (code) => {
+        wpCliProcess.on('close', async (code) => {
             if (code === 0) {
+                await this._wordpressSitesRepository.updateStatus(id, 'completed')
+                const app = await this._wordpressSitesRepository.findById(id)
+                if(app){
+                    const user = await this._userRepository.findByAppId(app.dataValues.id as any)
+                    console.log(user?.dataValues)
+                    
+                    const {consumer_key , secret_key } = await this._apiKeyService.generateApiKey(app.dataValues.url, 
+                        {wpUsr : user!.username, wpPsswd: user!.password})
+                        await this._apiKeyRepository.create({
+                            consumer_key: consumer_key,
+                            consumer_secret: secret_key,
+                        })
+
+                }
                 fs.appendFileSync(outputLogPath, 'Script execution completed successfully.');
                 if (!DirManager.deleteFile(scriptPath)) {
                     throw new Error(`Error deleting file`);
@@ -370,7 +442,7 @@ export default class DockerService {
                 fs.appendFileSync(outputLogPath, `Script execution failed with code ${code}`);
                 throw new DockerServiceException(`Script execution failed with code ${code}`, HttpStatusCodes.INTERNAL_SERVER_ERROR);
             }
-        });
+        }); 
 
         wpCliProcess.on('error', (err) => {
             console.error('Failed to start child process:', err);
@@ -388,4 +460,3 @@ export default class DockerService {
         }
     }
 }
-

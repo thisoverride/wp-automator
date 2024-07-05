@@ -1,11 +1,17 @@
 import express, { type Application, type Request, type Response, type NextFunction } from 'express';
 import PathValidator from '../validator/PathValidator';
-import morgan from 'morgan';
-import helmet from 'helmet';
 import DockerController from '../../controller/ControllerDocker';
 import DockerService from '../../service/DockerService';
-import Dockerode from 'dockerode';
+import database from '../sequelize/sequelize';
 import cors from 'cors';
+import morgan from 'morgan';
+import Dockerode from 'dockerode';
+import helmet from 'helmet';
+import WordpressSitesRepository from '../../repository/dao/WordpressSitesRepository';
+import UserRepository from '../../repository/dao/UserRepository';
+import ApiKeyRepository from '../../repository/dao/ApiKeyRepository';
+import ApiKeyService from '../../service/ApiKeyService';
+
 export default class ExpressApp {
   private readonly _app: Application;
   private readonly _controller: any[];
@@ -21,7 +27,15 @@ export default class ExpressApp {
     this._initExpressApp();
     this._pathValidator = new PathValidator();
     this._controller = [
-      new DockerController(new DockerService(new Dockerode()))
+      new DockerController(
+        new DockerService(
+          new Dockerode(),
+          new WordpressSitesRepository(),
+          new UserRepository(),
+          new ApiKeyRepository(),
+          new ApiKeyService(),
+        )
+      )
     ];
     this._injectControllers();
     this._setupErrorHandling();
@@ -83,7 +97,9 @@ export default class ExpressApp {
    */
   public async startEngine (port: number): Promise<void> {
     try {
-      this._app.listen(port, () => {
+      this._app.listen(port, async() => {
+        await database.authenticate();
+        await database.sync();
         console.info('\x1b[1m\x1b[36m%s\x1b[0m', `Service running on http://localhost:${port}`);
       });
     } catch (error) {
