@@ -1,5 +1,7 @@
-export default class DockerServiceException extends Error {
+import BaseException from "./BaseException";
+
+export default class DockerServiceException extends BaseException {
     constructor(message: string, public status: number) {
-      super(message);
+      super(message,status);
     }
   }
