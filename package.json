@@ -24,7 +24,9 @@
     "yarn": "^1.22.22"
   },
   "dependencies": {
+    "@types/crypto-js": "^4.2.2",
     "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
     "dockerode": "^4.0.2",
     "express": "^4.19.2",
     "helmet": "^7.1.0",
