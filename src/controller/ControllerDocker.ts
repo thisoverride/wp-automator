@@ -1,4 +1,4 @@
-import { Request, Response } from 'express'; 
+import { Request, Response } from 'express';
 import { Controller, HttpResponse } from './ControllerInterface';
 import DockerService from '../service/DockerService';
 import HttpStatusCodes from '../utils/HttpStatusCode';
@@ -8,7 +8,7 @@ export default class DockerController implements Controller {
   public readonly ROUTE: Array<string>;
   private readonly _dockerService: DockerService;
 
-  public constructor(dockerService :DockerService) {
+  public constructor(dockerService: DockerService) {
     this._dockerService = dockerService;
     this.ROUTE = [
       '@POST(/build/template,createTemplate)',
@@ -20,18 +20,18 @@ export default class DockerController implements Controller {
       '@POST(/containers/:app_name/stop-compose, stopCompose)',
       '@POST(/containers/:app_name/start-compose, startCompose)',
       '@POST(/containers/:id/remove,removeContainer)',
-      '@POST(/containers/:app_name/remove-all,removeContainerAssosiate)'
+      '@POST(/containers/:app_name/remove-all,removeContainerAssociate)'
     ];
   }
 
 
-/**
- * @Mapping POST(/build/template)
- * Builds template docker-compose container.
- * @param {Request} request - The request object.
- * @param {Response} response - The response object.
- * @returns {Promise<void>}
- */
+  /**
+   * @Mapping POST(/build/template)
+   * Builds template docker-compose container.
+   * @param {Request} request - The request object.
+   * @param {Response} response - The response object.
+   * @returns {Promise<void>}
+   */
   public async createTemplate(request: Request, response: Response): Promise<void> {
     const requestBody = {
       dirname: request.body.dirname,
@@ -47,33 +47,34 @@ export default class DockerController implements Controller {
       mysqlPort: request.body.mysql_port,
       nameApiKey: request.body.name_api_key,
       rules: request.body.rules,
-      addons : request.body.addons
+      addons: request.body.addons,
+      language: request.body.language
     } as GenerateRequestBody;
-    
+
     try {
-      const { status, message } : HttpResponse = await this._dockerService.buildTemplate(requestBody);
-      response.status(status).json({ response : message});
+      const { status, message }: HttpResponse = await this._dockerService.buildTemplate(requestBody);
+      response.status(status).json({ response: message });
     } catch (error: any) {
       response.status(error.status || HttpStatusCodes.INTERNAL_SERVER_ERROR)
-      .json({ message: error.message });
+        .json({ message: error.message });
     }
   }
 
-/**
- * @Mapping GET(/build-app)
- * Builds the Docker container.
- * @param {Request} request - The request object.
- * @param {Response} response - The response object.
- * @returns {Promise<void>}
- */
+  /**
+   * @Mapping GET(/build-app)
+   * Builds the Docker container.
+   * @param {Request} request - The request object.
+   * @param {Response} response - The response object.
+   * @returns {Promise<void>}
+   */
   public async runBuildMachine(request: Request, response: Response): Promise<void> {
     const { appName } = request.query;
     try {
-      const { status, message } : HttpResponse = await this._dockerService.build(appName as unknown as string);
+      const { status, message }: HttpResponse = await this._dockerService.build(appName as unknown as string);
       response.status(status).json(message);
     } catch (error: any) {
-       response.status(error.status || HttpStatusCodes.INTERNAL_SERVER_ERROR)
-      .json({ message: error.message });
+      response.status(error.status || HttpStatusCodes.INTERNAL_SERVER_ERROR)
+        .json({ message: error.message });
     }
   }
 
@@ -91,25 +92,25 @@ export default class DockerController implements Controller {
       response.status(status).json(message);
     } catch (error: any) {
       response.status(error.status || HttpStatusCodes.INTERNAL_SERVER_ERROR)
-     .json({ message: error.message });
+        .json({ message: error.message });
     }
   }
 
 
-/**
- * @Mapping GET(/images)
- * Retrieves all Docker images.
- * @param {Request} request - The request object.
- * @param {Response} response - The response object.
- * @returns {Promise<void>}
- */
+  /**
+   * @Mapping GET(/images)
+   * Retrieves all Docker images.
+   * @param {Request} request - The request object.
+   * @param {Response} response - The response object.
+   * @returns {Promise<void>}
+   */
   public async getAllImages(request: Request, response: Response): Promise<void> {
     const { status, message }: HttpResponse = await this._dockerService.getImagesInfos();
     try {
       response.status(status).json(message);
     } catch (error: any) {
       response.status(error.status || HttpStatusCodes.INTERNAL_SERVER_ERROR)
-      .json({ message: error.message });
+        .json({ message: error.message });
     }
   }
 
@@ -128,7 +129,7 @@ export default class DockerController implements Controller {
       response.status(status).json({ message: message });
     } catch (error: any) {
       response.status(error.status || HttpStatusCodes.INTERNAL_SERVER_ERROR)
-      .json({ message: error.message });
+        .json({ message: error.message });
     }
   }
 
@@ -140,16 +141,16 @@ export default class DockerController implements Controller {
    * @param {Response} response - The response object.
    * @returns {Promise<void>}
    */
-    public async stopContainer(request: Request, response: Response): Promise<void> {
-      const { id } = request.params;
-      try {
-        const  { status, message }: HttpResponse = await this._dockerService.stopContainer(id);
-        response.status(status).json({ message: message});
-      } catch (error: any) {
-        response.status(error.status || HttpStatusCodes.INTERNAL_SERVER_ERROR)
+  public async stopContainer(request: Request, response: Response): Promise<void> {
+    const { id } = request.params;
+    try {
+      const { status, message }: HttpResponse = await this._dockerService.stopContainer(id);
+      response.status(status).json({ message: message });
+    } catch (error: any) {
+      response.status(error.status || HttpStatusCodes.INTERNAL_SERVER_ERROR)
         .json({ message: error.message });
-      }
     }
+  }
 
 
   /**
@@ -159,18 +160,18 @@ export default class DockerController implements Controller {
    * @param {Response} response - The response object.
    * @returns {Promise<void>}
    */
-    public async startCompose(request: Request, response: Response): Promise<void> {
-      const { app_name } = request.params;
-      try {
-        const  { status, message }: HttpResponse = await this._dockerService.startDockerCompose(app_name);
-        response.status(status).json({ message: message});
-      } catch (error: any) {
-        response.status(error.status || HttpStatusCodes.INTERNAL_SERVER_ERROR)
+  public async startCompose(request: Request, response: Response): Promise<void> {
+    const { app_name } = request.params;
+    try {
+      const { status, message }: HttpResponse = await this._dockerService.startDockerCompose(app_name);
+      response.status(status).json({ message: message });
+    } catch (error: any) {
+      response.status(error.status || HttpStatusCodes.INTERNAL_SERVER_ERROR)
         .json({ message: error.message });
-      }
     }
+  }
 
-  
+
   /**
    * @Mapping POST(/containers/:id/stop-compose)
    * Stops a Docker-compose container.
@@ -178,16 +179,16 @@ export default class DockerController implements Controller {
    * @param {Response} response - The response object.
    * @returns {Promise<void>}
    */
-    public async stopCompose(request: Request, response: Response): Promise<void> {
-      const { app_name } = request.params;
-      try {
-        const  { status, message }: HttpResponse = await this._dockerService.stopDockerCompose(app_name);
-        response.status(status).json({ message: message});
-      } catch (error: any) {
-        response.status(error.status || HttpStatusCodes.INTERNAL_SERVER_ERROR)
+  public async stopCompose(request: Request, response: Response): Promise<void> {
+    const { app_name } = request.params;
+    try {
+      const { status, message }: HttpResponse = await this._dockerService.stopDockerCompose(app_name);
+      response.status(status).json({ message: message });
+    } catch (error: any) {
+      response.status(error.status || HttpStatusCodes.INTERNAL_SERVER_ERROR)
         .json({ message: error.message });
-      }
     }
+  }
 
 
   /**
@@ -204,26 +205,28 @@ export default class DockerController implements Controller {
       response.status(status).json({ message: message });
     } catch (error: any) {
       response.status(error.status || HttpStatusCodes.INTERNAL_SERVER_ERROR)
-      .json({ message: error.message });
+        .json({ message: error.message });
     }
   }
 
 
   /**
-   * @Mapping POST(/containers/:app_name/remove)
+   * @Mapping POST(/containers/:app_name/remove-all,removeContainerAssociate)
    * Remove all Docker container project .
    * @param {Request} request - The request object.
    * @param {Response} response - The response object.
    * @returns {Promise<void>}
    */
-  public async removeContainerAssosiate(request: Request, response: Response): Promise<void> {
+  public async removeContainerAssociate(request: Request, response: Response): Promise<void> {
     const { app_name } = request.params;
+    const delete_project = Boolean(request.query.delete_project);
     try {
-      const { status, message }: HttpResponse = await this._dockerService.removeContainersAndVolumes(app_name);
+      const { status, message }: HttpResponse = await this._dockerService.removeContainersAndVolumes(app_name, delete_project);
       response.status(status).json({ message: message });
     } catch (error: any) {
       response.status(error.status || HttpStatusCodes.INTERNAL_SERVER_ERROR)
-      .json({ message: error.message });
+        .json({ message: error.message });
     }
   }
+
 }
