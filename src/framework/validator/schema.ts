@@ -22,7 +22,8 @@ const requestBodySchema = Joi.object({
   wpProjectName: Joi.string().required(),
   nameApiKey: Joi.string().required(),
   rules: Joi.string().required(),
-  addons: Joi.array().required()
+  addons: Joi.array().required(),
+  language: Joi.string().required()
 });
 
 export { requestBodySchema };

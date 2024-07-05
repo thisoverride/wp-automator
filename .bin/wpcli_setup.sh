@@ -34,39 +34,48 @@ until [ $(docker-compose exec -T wordpress curl --output /dev/null --silent --he
     
     sleep 2
 done
+
 # Execute all wp-cli commands in a single container session
 docker-compose run --rm --user="root" wpcli bash -c "
+    # Check if WordPress core files exist
+    if [ -f '/var/www/html/wp-config.php' ]; then
+        echo 'WordPress files detected.'
+    else
+        echo 'WordPress files not detected. Downloading WordPress...'
+        wp core download --path='/var/www/html' --allow-root;
+    fi
 
-# Check if WordPress core files exist
-if [ -f '/var/www/html/wp-config.php' ]; then
-    echo 'WordPress files detected.'
-else
-    echo 'WordPress files not detected. Downloading WordPress...'
-    wp core download --path='/var/www/html' --allow-root;
-fi
+    # Check if WordPress is installed
+    if wp core is-installed --allow-root 2>/dev/null; then
+      echo 'WordPress is already installed.'
+    else
+      echo 'Installing WordPress...'
+      wp core install --path='/var/www/html' --url='http://%{WP_HOST}:%{WP_PORT}' --title='%{WP_PROJECT_NAME}' --admin_user='%{WP_USER}' --admin_password='%{WP_PASSWORD}' --admin_email='%{WP_EMAIL}' --allow-root;
+    fi
 
-# Check if WordPress is installed
-if wp core is-installed --allow-root 2>/dev/null; then
-  echo 'WordPress is already installed.'
-else
-  echo 'Installing WordPress...'
-  wp core install --path='/var/www/html' --url='http://%{WP_HOST}:%{WP_PORT}' --title='%{WP_PROJECT_NAME}' --admin_user='%{WP_USER}' --admin_password='%{WP_PASSWORD}' --admin_email='%{WP_EMAIL}' --allow-root;
-fi
+    # Language setup
+    echo 'Setting up the language...'
+    wp language core install %{WP_LANGUAGE} --allow-root;
+    wp language core activate %{WP_LANGUAGE} --allow-root;
 
-# Install and activate the WooCommerce plugin
-echo 'Install addons...'
-wp plugin install %{ADDONS} --activate --allow-root;
+    # Install and activate the WooCommerce plugin
+    echo 'Install addons...'
+    wp plugin install %{ADDONS} --activate --allow-root;
 
+    # Set the permalink structure
+    echo 'Setting the permalink structure...'
+    wp rewrite structure '/%postname%/' --allow-root;
 
-# Set the permalink structure
-echo 'Setting the permalink structure...'
-wp rewrite structure '/%postname%/' --allow-root;
-
-# Flush rewrite rules | The command bellow already flush the rewrite rules but it's good to have it here :)
-echo 'Flushing rewrite rules...'
-wp rewrite flush --allow-root;
+    # Flush rewrite rules | The command bellow already flush the rewrite rules but it's good to have it here :)
+    echo 'Flushing rewrite rules...'
+    wp rewrite flush --allow-root;
 "
 
-# Change the owner of the files
-docker-compose exec wordpress chown -R www-data:www-data /var/www/html
-echo 'File permission changed'
+docker-compose exec wordpress bash -c '
+  chmod 644 ./wp-config.php && \
+  echo "define('\''JWT_AUTH_SECRET_KEY'\'', '\''%{SECRET_KEY}'\'');" >> ./wp-config.php && \
+  chmod 444 ./wp-config.php;
+
+  chown -R www-data:www-data /var/www/html;
+  echo 'File permission changed';
+'
