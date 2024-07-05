@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'path'
-import { HttpStatusCodes, DirManager } from '../utils/Utils'
+import { HttpStatusCodes, DirManager, Tools } from '../utils/Utils'
 import Dockerode, { ContainerInfo, ContainerInspectInfo, ContainerListOptions, ImageInfo } from 'dockerode';
 import { v2 as compose } from 'docker-compose'
 import DockerServiceException from '../core/exception/DockerServiceException';
@@ -8,6 +8,8 @@ import { HttpResponse } from '../controller/ControllerInterface';
 import { requestBodySchema } from '../framework/validator/schema'
 import { spawn } from 'node:child_process';
 import type { GenerateRequestBody } from '../@type/global';
+import sha256 from 'crypto-js/sha256';
+
 
 export default class DockerService {
     private readonly _docker: Dockerode;
@@ -70,12 +72,14 @@ export default class DockerService {
 
             const wpcliEnvironmentVars = {
                 '%{MYSQL_ROOT_PASSWORD}': requestBody.mysqlRootPassword.toString(),
+                '%{WP_LANGUAGE}': requestBody.language.toString(),
                 '%{WP_HOST}': requestBody.wpHost.toString(),
                 '%{WP_PORT}': requestBody.wpPort.toString(),
                 '%{WP_PROJECT_NAME}': requestBody.wpProjectName.toString(),
                 '%{WP_USER}': requestBody.username.toString(),
                 '%{WP_PASSWORD}': requestBody.wpPassword.toString(),
                 '%{WP_EMAIL}': requestBody.email.toString(),
+                '%{SECRET_KEY}': sha256(Tools.generateRandomString(20)).toString(),
             };
 
             const dockerizedTemplate: string = DirManager.replaceTemplateFlags(DockerTemplateFile, dockerEnvironmentVars);
@@ -86,18 +90,18 @@ export default class DockerService {
                     await DirManager.deleteDir(folderPath);
                     throw new DockerServiceException('Erreur lors de l\'écriture du fichier', HttpStatusCodes.INTERNAL_SERVER_ERROR);
                 }
-                
+
                 let addonScript = '';
                 for (const addonItem of requestBody.addons) {
                     addonScript += `${addonItem.slug} `
                 }
-                wpcliTemplate = wpcliTemplate.replace('%{ADDONS}',addonScript);
+                wpcliTemplate = wpcliTemplate.replace('%{ADDONS}', addonScript);
 
                 if (!await DirManager.writeFile(folderPath + '/wpcli_setup.sh', wpcliTemplate)) {
                     await DirManager.deleteDir(folderPath);
                     throw new DockerServiceException('Erreur lors de l\'écriture du fichier', HttpStatusCodes.INTERNAL_SERVER_ERROR);
                 }
-                
+
             } else {
                 throw new DockerServiceException('Erreur lors de creation du dossier', HttpStatusCodes.INTERNAL_SERVER_ERROR);
             }
@@ -128,14 +132,12 @@ export default class DockerService {
             console.log('Application is running');
 
             await this.executeBashScript(folderPath);
-            console.log('Script executed successfully');
 
             return { message: 'Lancement de la machine de build', status: HttpStatusCodes.OK };
         } catch (error) {
             return this.handleError(error);
         }
     }
-
 
     public async getContainersInfos(): Promise<HttpResponse> {
         try {
@@ -155,7 +157,6 @@ export default class DockerService {
         }
     }
 
-
     public async startDockerCompose(appName: string): Promise<HttpResponse> {
         try {
             const folderPath: string = path.join(DockerService.WP_SITES_DIR_PATH, appName);
@@ -167,36 +168,37 @@ export default class DockerService {
         }
     }
 
-    public async removeContainersAndVolumes(appName: string): Promise<HttpResponse> {
+    public async removeContainersAndVolumes(appName: string, delete_project: Boolean): Promise<HttpResponse> {
         try {
             const folderPath: string = path.join(DockerService.WP_SITES_DIR_PATH, appName);
-    
+            let message = '';
             if (!fs.existsSync(folderPath)) {
                 throw new DockerServiceException(
                     `Le projet ${appName} n'existe pas.`,
                     HttpStatusCodes.NOT_FOUND
                 );
             }
-    
+
             const composeConfig = path.join(folderPath, 'docker-compose.yml');
-    
+
             if (!fs.existsSync(composeConfig)) {
                 throw new DockerServiceException(
                     `Fichier docker-compose.yml introuvable pour le projet ${appName}.`,
                     HttpStatusCodes.NOT_FOUND
                 );
             }
-            await compose.down({ cwd: folderPath, log: true }); 
-            const containers: ContainerInfo[] = await this._docker.listContainers({ all: true }); 
+
+            await compose.down({ cwd: folderPath, log: true });
+            const containers: ContainerInfo[] = await this._docker.listContainers({ all: true });
             const projectContainers = containers.filter(container =>
                 container.Labels['com.docker.compose.project'] === appName
             );
-    
+
             for (const containerInfo of projectContainers) {
                 const container = this._docker.getContainer(containerInfo.Id);
                 await container.remove({ force: true });
             }
-    
+
 
             const volumes = await this._docker.listVolumes();
             const projectVolumes = volumes.Volumes.filter(volume =>
@@ -207,15 +209,27 @@ export default class DockerService {
                 const volume = this._docker.getVolume(volumeInfo.Name);
                 await volume.remove();
             }
-    
-            return { message: `Tous les conteneurs et volumes associés à ${appName} ont été supprimés avec succès.`, 
-            status: HttpStatusCodes.OK };
+            message = `Tous les conteneurs et volumes associés à ${appName} ont été supprimés avec succès.`;
+
+            if (delete_project) {
+                if (await DirManager.folderExists(folderPath)) {
+             
+                    if (await DirManager.deleteDir(folderPath)) {
+                        message += `Le repertoire du projet ${appName} a été supprimé correctement.`
+                    } else {
+                        throw new DockerServiceException('Erreur lors de la suppression du projet', HttpStatusCodes.INTERNAL_SERVER_ERROR);
+                    }
+       
+                } else {
+                    throw new DockerServiceException(`Le répertoire ${folderPath} n'existe pas`, HttpStatusCodes.NOT_FOUND);
+                }
+            }
+
+            return { message: message, status: HttpStatusCodes.OK };
         } catch (error: any) {
             return this.handleError(error);
         }
     }
-    
-
 
     public async stopDockerCompose(appName: string): Promise<HttpResponse> {
         try {
@@ -316,7 +330,7 @@ export default class DockerService {
     }
 
 
-    private async executeBashScript(folderPath: string) : Promise<void> {
+    private async executeBashScript(folderPath: string): Promise<void> {
         const scriptPath = `${folderPath}/wpcli_setup.sh`;
         const outputLogPath = `${folderPath}/wpcli_output.log`;
 
@@ -349,7 +363,7 @@ export default class DockerService {
         wpCliProcess.on('close', (code) => {
             if (code === 0) {
                 fs.appendFileSync(outputLogPath, 'Script execution completed successfully.');
-                if(!DirManager.deleteFile(scriptPath)){
+                if (!DirManager.deleteFile(scriptPath)) {
                     throw new Error(`Error deleting file`);
                 }
             } else {
