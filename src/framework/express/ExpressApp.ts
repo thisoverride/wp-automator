@@ -10,7 +10,7 @@ import helmet from 'helmet';
 import WordpressSitesRepository from '../../repository/dao/WordpressSitesRepository';
 import UserRepository from '../../repository/dao/UserRepository';
 import ApiKeyRepository from '../../repository/dao/ApiKeyRepository';
-import ApiKeyService from '../../service/ApiKeyService';
+import ApiKeyService from '../../service/AutomatorService';
 
 export default class ExpressApp {
   private readonly _app: Application;
