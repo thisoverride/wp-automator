@@ -340,9 +340,9 @@ export default class DockerService {
         //     console.log(user?.dataValues)
         // const { consumer_key, secret_key } = await this._automatorService.generateApiKey(app.dataValues.url,
         //     { wpUsr: user!.username, wpPsswd: user!.password })
-        // const { consumer_key, secret_key } = await this._automatorService.generateApiKey('padek:8080',
-        //     { wpUsr: 'mon_utilisateur', wpPsswd: 'monemail@example.com' });
-        // console.log(consumer_key, secret_key);
+        const { consumer_key, secret_key } = await this._automatorService.generateApiKey('padek:8080',
+            { wpUsr: 'mon_utilisateur', wpPsswd: 'mysqLPass123#S' });
+        console.log(consumer_key, secret_key);
 
         //     await this._apiKeyRepository.create({ consumer_key: consumer_key, consumer_secret: secret_key })
         // };
