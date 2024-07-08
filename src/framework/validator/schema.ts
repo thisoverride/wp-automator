@@ -19,7 +19,6 @@ const requestBodySchema = Joi.object({
   mysqlPort: Joi.number().integer().min(1).max(65535).required(),
   wpPort: Joi.number().integer().min(1).max(65535).required(),
   wpHost: Joi.string().required(),
-  wpProjectName: Joi.string().required(),
   nameApiKey: Joi.string().required(),
   rules: Joi.string().required(),
   addons: Joi.array().required(),
