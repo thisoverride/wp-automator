@@ -5,6 +5,7 @@ export interface GenerateRequestBody {
   wpPassword: string;
   wpPort: number;
   wpHost: string;
+  wpVersion: string;
   mysqlRootPassword: string;
   mysqlUser: string;
   mysqlPassword: string;

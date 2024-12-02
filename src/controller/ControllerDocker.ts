@@ -179,6 +179,7 @@ export default class DockerController implements Controller {
    * @returns {Promise<void>}
    */
   public async stopCompose(request: Request, response: Response): Promise<void> {
+    console.log('ici')
     const { app_name } = request.params;
     try {
       const { status, message }: HttpResponse = await this._dockerService.stopDockerCompose(app_name);
