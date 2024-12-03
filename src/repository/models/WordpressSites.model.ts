@@ -1,4 +1,3 @@
-// models/WordpressSites.ts
 import { Model, Table, Column, DataType, Unique } from 'sequelize-typescript';
 import { WordpressSitesAttributes } from '../../@type/repository/models/Models';
 
