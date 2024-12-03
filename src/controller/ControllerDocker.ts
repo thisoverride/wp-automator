@@ -40,6 +40,7 @@ export default class DockerController implements Controller {
       wpPassword: request.body.wp_psswd,
       wpPort: request.body.wp_port,
       wpHost: request.body.wp_host,
+      wpVersion: request.body.wp_version,
       mysqlRootPassword: request.body.mysql_root_psswd,
       mysqlUser: request.body.mysql_user,
       mysqlPassword: request.body.mysql_psswd,
