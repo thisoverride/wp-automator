@@ -53,7 +53,7 @@ export default class DockerController implements Controller {
 
     try {
       const { status, message }: HttpResponse = await this._dockerService.buildTemplate(requestBody);
-      response.status(status).json({ response: message });
+      response.status(status).json({ message });
     } catch (error: any) {
       response.status(error.status || HttpStatusCodes.INTERNAL_SERVER_ERROR)
         .json({ message: error.message });

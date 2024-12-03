@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Docker Management Console</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="./style.css">
+    <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 <body>
     <div class="container">
@@ -27,9 +27,12 @@
             </h2>
             <form id="create-template-form">
                 <div class="form-grid">
-                    <select class="form-input" id="languageDropdown" required>
-                        <option value="" disabled selected>Select language</option>
-                    </select>
+                  <select class="form-input" id="languageDropdown" required>
+                    <option value="" disabled selected>Select language</option>
+                    <% langs.forEach(function(lang) { %>
+                        <option value="<%= lang.code %>"><%= lang.language %></option>
+                    <% }); %>
+                </select>
                     <input type="text" class="form-input" id="dirname" placeholder="Directory Name" value="mon_projet_exemple" required>
                     <input type="text" class="form-input" id="username" placeholder="Username" value="mon_utilisateur" required>
                     <input type="email" class="form-input" id="email" placeholder="Email" value="monemail@example.com" required>
@@ -37,8 +40,13 @@
                     <input type="number" class="form-input" id="wpPort" placeholder="WordPress Port" value="8080" required>
                     <input type="text" class="form-input" id="wpProjectName" placeholder="WordPress Project Name" value="mon_projet_exemple" required>
                     <input type="text" class="form-input" id="wpHost" placeholder="WordPress Host" value="localhost" required>
-                    <select class="form-input" id="wp-version-Dropdown" required>
+                       <select class="form-input" id="wp-version-Dropdown" required>
                         <option value="" disabled selected>Select version</option>
+                        <% if (wordpressVersions && wordpressVersions.length > 0) { %>
+                            <% wordpressVersions.forEach(function(version) { %>
+                                <option value="<%= version.name %>"><%= version.name %></option>
+                            <% }); %>
+                        <% } %>
                     </select>
                 </div>
                 <div class="form-grid">
@@ -141,5 +149,6 @@
             <pre id="output">> Docker Management Console initialized...</pre>
         </section>
     </div>
+    <script src="/assets/js/main.js"></script>
 </body>
 </html>
