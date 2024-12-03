@@ -40,6 +40,7 @@ export default class DockerController implements Controller {
       wpPassword: request.body.wp_psswd,
       wpPort: request.body.wp_port,
       wpHost: request.body.wp_host,
+      wpVersion: request.body.wp_version,
       mysqlRootPassword: request.body.mysql_root_psswd,
       mysqlUser: request.body.mysql_user,
       mysqlPassword: request.body.mysql_psswd,
@@ -52,7 +53,7 @@ export default class DockerController implements Controller {
 
     try {
       const { status, message }: HttpResponse = await this._dockerService.buildTemplate(requestBody);
-      response.status(status).json({ response: message });
+      response.status(status).json({ message });
     } catch (error: any) {
       response.status(error.status || HttpStatusCodes.INTERNAL_SERVER_ERROR)
         .json({ message: error.message });
@@ -179,6 +180,7 @@ export default class DockerController implements Controller {
    * @returns {Promise<void>}
    */
   public async stopCompose(request: Request, response: Response): Promise<void> {
+    console.log('ici')
     const { app_name } = request.params;
     try {
       const { status, message }: HttpResponse = await this._dockerService.stopDockerCompose(app_name);
