@@ -228,4 +228,4 @@ class WordPressManager {
 }
 
 
-document.addEventListener("DOMContentLoaded", () => { new WordPressManager("http://localhost:8002") });
+document.addEventListener("DOMContentLoaded", () => { new WordPressManager("http://dalency-io:8002") });
