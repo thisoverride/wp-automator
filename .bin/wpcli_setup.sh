@@ -94,7 +94,7 @@ docker-compose run --rm --user="root" wpcli bash -c "
 
     # Check if JWT Authentication for WP REST API plugin is installed and set jwt secret key
     if wp plugin is-installed jwt-authentication-for-wp-rest-api; then
-        wp config set JWT_AUTH_SECRET_KEY \"$SECRET_KEY\";
+        wp config set JWT_AUTH_SECRET_KEY \"$SECRET_KEY\" --anchor='// (See also https://wordpress.stackexchange.com/a/152905/199287)' --placement=before;
     fi
 
     # Set the permalink structure
