@@ -98,8 +98,8 @@ export default class ExpressApp {
   public async startEngine (port: number): Promise<void> {
     try {
       this._app.listen(port, async() => {
-        await database.authenticate();
-        await database.sync();
+        // await database.authenticate();
+        // await database.sync();
         console.info('\x1b[1m\x1b[36m%s\x1b[0m', `Service running on http://localhost:${port}`);
       });
     } catch (error) {

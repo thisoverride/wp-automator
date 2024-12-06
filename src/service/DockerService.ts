@@ -45,10 +45,10 @@ export default class DockerService {
         try {
             const folderPath: string = path.join(DockerService.WP_SITES_DIR_PATH, requestBody.dirname);
             let dockerTemplatePath: string = path.join(__dirname, '..', '..', '.bin', '.platform', 'docker-compose.yml');
-            const DockerTemplateFile = await DirManager.readfile(dockerTemplatePath);
+            const DockerTemplateFile: string | null = await DirManager.readfile(dockerTemplatePath);
 
             let wpcliTemplatePath: string = path.join(__dirname, '..', '..', '.bin', 'wpcli_setup.sh');
-            const wpcliTemplateFile = await DirManager.readfile(wpcliTemplatePath);
+            const wpcliTemplateFile: string | null = await DirManager.readfile(wpcliTemplatePath);
 
             if (!DockerTemplateFile) {
                 throw new DockerServiceException(`Impossible de localiser la source dockerTemplatePath}`,
@@ -70,6 +70,7 @@ export default class DockerService {
                 'WP_LANGUAGE': requestBody.language.toString(),
                 'WP_HOST': requestBody.wpHost.toString(),
                 'WP_USER': requestBody.username.toString(),
+                'WP_VERSION': requestBody.wpVersion.toString(),
                 'WP_PASSWORD': `\"${requestBody.wpPassword.toString()}\"`,
                 'WP_EMAIL': requestBody.email.toString(),
                 'SECRET_KEY': sha256(Tools.generateRandomString(20)).toString(),
@@ -340,9 +341,9 @@ export default class DockerService {
         //     console.log(user?.dataValues)
         // const { consumer_key, secret_key } = await this._automatorService.generateApiKey(app.dataValues.url,
         //     { wpUsr: user!.username, wpPsswd: user!.password })
-        const { consumer_key, secret_key } = await this._automatorService.generateApiKey('padek:8080',
-            { wpUsr: 'mon_utilisateur', wpPsswd: 'mysqLPass123#S' });
-        console.log(consumer_key, secret_key);
+        // const { consumer_key, secret_key } = await this._automatorService.generateApiKey('padek:8080',
+        //     { wpUsr: 'mon_utilisateur', wpPsswd: 'mysqLPass123#S' });
+        // console.log(consumer_key, secret_key);
 
         //     await this._apiKeyRepository.create({ consumer_key: consumer_key, consumer_secret: secret_key })
         // };
