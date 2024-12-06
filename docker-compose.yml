@@ -9,3 +9,10 @@ services:
     volumes:
       - .:/usr/src/swiftwordpress
       - /usr/src/swiftwordpress/node_modules
+    networks:
+      - postgres_network
+
+networks:
+  postgres_network:
+    name: postgres_network
+    external: true
