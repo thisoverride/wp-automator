@@ -1,7 +1,5 @@
 services:
   wordpress:
-    depends_on:
-      - db
     image: wordpress:${WP_VERSION}
     ports:
       - "${WP_PORT}:80"
@@ -10,10 +8,35 @@ services:
       WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
       WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
       WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+      WP_HOST: ${WP_HOST}
+      WP_PORT: ${WP_PORT}
+      WP_USER: ${WP_USER}
+      WP_PASSWORD: ${WP_PASSWORD}
+      WP_EMAIL: ${WP_EMAIL}
+      WP_LANGUAGE: ${WP_LANGUAGE}
+      PROJECT_NAME: ${PROJECT_NAME}
+      SECRET_KEY: ${SECRET_KEY}
     volumes:
-      - wp:/var/www/html
-    labels:
-      com.docker.compose.project: ${PROJECT_NAME}
+      - wordpress_data:/var/www/html
+      - ./wait-for-db.sh:/usr/local/bin/wait-for-db.sh
+      - ./wpcli_setup.sh:/usr/local/bin/wpcli_setup.sh
+      - ./wp-cli.phar:/usr/local/bin/wp
+    entrypoint: >
+      /bin/sh -c "
+        if [ ! -f /var/www/html/.entrypoint_done ]; then
+          apt-get update &&
+          apt-get install -y default-mysql-client curl &&
+          chmod +x /usr/local/bin/wp &&
+          chmod +x /usr/local/bin/wait-for-db.sh &&
+          chmod +x /usr/local/bin/wpcli_setup.sh &&
+          /usr/local/bin/wait-for-db.sh &&
+          /usr/local/bin/wpcli_setup.sh &&
+          touch /var/www/html/.entrypoint_done
+        fi &&
+        exec /usr/local/bin/docker-entrypoint.sh apache2-foreground
+      "
+    depends_on:
+      - db
 
   db:
     image: mysql:8.0
@@ -22,32 +45,11 @@ services:
       MYSQL_USER: ${WORDPRESS_DB_USER}
       MYSQL_PASSWORD: ${WORDPRESS_DB_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-    volumes:
-      - db:/var/lib/mysql
     ports:
       - "${DB_PORT}:3306"
-    labels:
-      com.docker.compose.project: ${PROJECT_NAME}
-
-  wpcli:
-    image: wordpress:cli
-    environment:
-      WORDPRESS_DB_HOST: db
-      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
-      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
-      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
     volumes:
-      - wp:/var/www/html
-    depends_on:
-      - db
-      - wordpress
-    labels:
-      com.docker.compose.project: ${PROJECT_NAME}
+      - db_data:/var/lib/mysql
 
 volumes:
-  db:
-    labels:
-      com.docker.compose.project: ${PROJECT_NAME}
-  wp:
-    labels:
-      com.docker.compose.project: ${PROJECT_NAME}
+  wordpress_data:
+  db_data:
