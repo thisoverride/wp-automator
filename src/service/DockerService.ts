@@ -24,6 +24,7 @@ export default class DockerService {
     private readonly _dockerManager: DockerManager;
     public static readonly WP_SITES_DIR_PATH: string = path.join(__dirname, '..', '..', '..', '/wp-sites/');
     public static readonly WP_SITES_DIR_PLATFORM_PATH: string = path.join(__dirname, '..', '..', '.bin', '.platform');
+    public static readonly WP_SITES_DIR_BIN_PATH: string = path.join(__dirname, '..', '..', '.bin');
 
     public constructor(
         dockernode: Dockerode,
@@ -43,19 +44,19 @@ export default class DockerService {
     @ValidateBody
     public async buildTemplate(requestBody: GenerateRequestBody): Promise<HttpResponse> {
         try {
-            const folderPath: string = path.join(DockerService.WP_SITES_DIR_PATH, requestBody.dirname);
-            let dockerTemplatePath: string = path.join(__dirname, '..', '..', '.bin', '.platform', 'docker-compose.yml');
-            const DockerTemplateFile: string | null = await DirManager.readfile(dockerTemplatePath);
+            const wp_site_folder: string = path.join(DockerService.WP_SITES_DIR_PATH, requestBody.dirname);
+            let docker_template_file: string = path.join(__dirname, '..', '..', '.bin', '.platform', 'docker-compose.yml');
+            const DockerTemplateFile: string | null = await DirManager.readfile(docker_template_file);
 
-            let wpcliTemplatePath: string = path.join(__dirname, '..', '..', '.bin', 'wpcli_setup.sh');
-            const wpcliTemplateFile: string | null = await DirManager.readfile(wpcliTemplatePath);
+            let wpcli_setup_file: string = path.join(__dirname, '..', '..', '.bin', 'wpcli_setup_v.2.0.sh');
+            const wpcliTemplateFile: string | null = await DirManager.readfile(wpcli_setup_file);
 
             if (!DockerTemplateFile) {
-                throw new DockerServiceException(`Impossible de localiser la source dockerTemplatePath}`,
+                throw new DockerServiceException(`Impossible de localiser la source ${docker_template_file}`,
                     HttpStatusCodes.NOT_FOUND);
             }
             if (!wpcliTemplateFile) {
-                throw new DockerServiceException(`Impossible de localiser la source wpcliTamplatePath}`,
+                throw new DockerServiceException(`Impossible de localiser la source ${wpcli_setup_file}`,
                     HttpStatusCodes.NOT_FOUND);
             }
 
@@ -75,29 +76,39 @@ export default class DockerService {
                 'WP_EMAIL': requestBody.email.toString(),
                 'SECRET_KEY': sha256(Tools.generateRandomString(20)).toString(),
             };
-
-            if (await DirManager.createDir(folderPath)) {
-                if (!await DirManager.copyFile(dockerTemplatePath, `${folderPath}/docker-compose.yml`)) {
-                    await DirManager.deleteDir(folderPath);
-                    throw new DockerServiceException('Erreur lors de la copie du fichier', HttpStatusCodes.INTERNAL_SERVER_ERROR);
+            
+            if (await DirManager.createDir(wp_site_folder)) {
+                console.log("folder :",wp_site_folder, "created", await DirManager.folderExists(wp_site_folder));
+                                
+                if (!await DirManager.copyFile(docker_template_file, path.join(wp_site_folder,'docker-compose.yml'))) {
+                    await DirManager.deleteDir(wp_site_folder);
+                    throw new DockerServiceException('Erreur lors de la copie du fichier docker-compose.yml', HttpStatusCodes.INTERNAL_SERVER_ERROR);
                 }
 
+                const wait_for_db_file = path.join(DockerService.WP_SITES_DIR_BIN_PATH,'wait-for-db.sh');
+                if(!await DirManager.copyFile(wait_for_db_file, path.join(wp_site_folder,'wait-for-db.sh'))) {
+                    await DirManager.deleteDir(wp_site_folder);
+                    throw new DockerServiceException('Erreur lors de la copie du fichier (wait-for-db.sh)', HttpStatusCodes.INTERNAL_SERVER_ERROR);
+                }
+
+                const wpcli_phar_file = path.join(DockerService.WP_SITES_DIR_BIN_PATH,'wp-cli.phar');
+                if(!await DirManager.copyFile(wpcli_phar_file, path.join(wp_site_folder,'wp-cli.phar'))) {
+                    await DirManager.deleteDir(wp_site_folder);
+                    throw new DockerServiceException('Erreur lors de la copie du fichier (wp-cli.phar)', HttpStatusCodes.INTERNAL_SERVER_ERROR);
+                }
 
                 const envContent = Object.entries(dockerEnvironmentVars).map(([key, value]) => `${key}=${value}`).join('\n');
-                if (!await DirManager.createFile(`${folderPath}/.env`, envContent)) {
-                    await DirManager.deleteDir(folderPath);
+                if (!await DirManager.createFile(`${wp_site_folder}/.env`, envContent)) {
+                    await DirManager.deleteDir(wp_site_folder);
                     throw new DockerServiceException('Erreur lors de la création du fichier', HttpStatusCodes.INTERNAL_SERVER_ERROR);
                 }
-
-                let addonScript: string = '';
-                for (const addonItem of requestBody.addons) {
-                    addonScript += `${addonItem.slug} `
-                }
+            
+                let addonScript: string = requestBody.addons.map(addonItem => `"${addonItem.slug}"`).join('\u0020'); // \u0020 -> ASCII code for space character
 
                 let wpcliTemplate = wpcliTemplateFile.replace('%{ADDONS}', addonScript);
 
-                if (!await DirManager.writeFile(folderPath + '/wpcli_setup.sh', wpcliTemplate)) {
-                    await DirManager.deleteDir(folderPath);
+                if (!await DirManager.writeFile(wp_site_folder + '/wpcli_setup.sh', wpcliTemplate)) {
+                    await DirManager.deleteDir(wp_site_folder);
                     throw new DockerServiceException('Erreur lors de l\'écriture du fichier', HttpStatusCodes.INTERNAL_SERVER_ERROR);
                 }
 
@@ -118,7 +129,7 @@ export default class DockerService {
             }
             return { message: 'Le template a été généré avec succès.', status: HttpStatusCodes.OK }
         } catch (error) {
-            console.error(error);
+            console.error("serviceError",error);
 
             return this.handleError(error);
         }
@@ -136,22 +147,7 @@ export default class DockerService {
                 throw new DockerServiceException(`Ce projet ne contient pas de modèle de configuration Docker (docker-compose.yml)`,
                     HttpStatusCodes.NOT_FOUND);
             }
-            this.runBuildProcess(folderPath, appName);
-
-            return { message: 'Lancement de la machine de build', status: HttpStatusCodes.OK };
-        } catch (error) {
-            return this.handleError(error);
-        }
-    }
-
-    private async runBuildProcess(folderPath: string, appName: string): Promise<void> {
-        // let applicationWp: WordpressSites | null = null;
-        try {
-            // applicationWp = await this._wordpressSitesRepository.findByName(appName);
-
-            // if (!applicationWp) {
-            //     throw new Error(`WordpressSite with name ${appName} not found.`);
-            // }
+            // this.runBuildProcess(folderPath, appName);
 
             // await this._wordpressSitesRepository.updateStatus(applicationWp.id, 'pulling')
             await this._dockerManager.composePull(folderPath);
@@ -159,17 +155,38 @@ export default class DockerService {
             // await this._wordpressSitesRepository.updateStatus(applicationWp.id, 'mount');
             await this._dockerManager.composeUp(folderPath);
 
-            // await this._wordpressSitesRepository.updateStatus(applicationWp.id, 'instalation');
-            await this.executeBashScript(folderPath, 0);
-
+            return { message: 'Lancement de la machine de build', status: HttpStatusCodes.OK };
         } catch (error) {
-            console.error(error);
-            // if (applicationWp && applicationWp.id) {
-            //     applicationWp.status = 'failed'
-            //     await this._wordpressSitesRepository.updateStatus(applicationWp.id, 'failed')
-            // }
+            return this.handleError(error);
         }
     }
+
+    // private async runBuildProcess(folderPath: string, appName: string): Promise<void> {
+    //     let applicationWp: WordpressSites | null = null;
+    //     try {
+    //         applicationWp = await this._wordpressSitesRepository.findByName(appName);
+
+    //         if (!applicationWp) {
+    //             throw new Error(`WordpressSite with name ${appName} not found.`);
+    //         }
+
+    //         await this._wordpressSitesRepository.updateStatus(applicationWp.id, 'pulling')
+    //         await this._dockerManager.composePull(folderPath);
+
+    //         await this._wordpressSitesRepository.updateStatus(applicationWp.id, 'mount');
+    //         await this._dockerManager.composeUp(folderPath);
+
+    //         await this._wordpressSitesRepository.updateStatus(applicationWp.id, 'instalation');
+    //         await this.executeBashScript(folderPath, 0);
+
+    //     } catch (error) {
+    //         console.error(error);
+    //         if (applicationWp && applicationWp.id) {
+    //             applicationWp.status = 'failed'
+    //             await this._wordpressSitesRepository.updateStatus(applicationWp.id, 'failed')
+    //         }
+    //     }
+    // }
 
     public async getContainersInfos(): Promise<HttpResponse> {
         try {
@@ -212,17 +229,16 @@ export default class DockerService {
         try {
             const folderPath: string = path.join(DockerService.WP_SITES_DIR_PATH, appName);
             let message = '';
-            if (!DirManager.folderExists(folderPath)) {
+            if (! (await DirManager.folderExists(folderPath))) {                
                 throw new DockerServiceException(`Le projet ${appName} n'existe pas.`, HttpStatusCodes.NOT_FOUND);
             }
 
             const composeConfig: string = path.join(folderPath, 'docker-compose.yml');
-            if (!DirManager.folderExists(composeConfig)) {
+            if (!(await DirManager.folderExists(composeConfig))) {
                 throw new DockerServiceException(`Fichier docker-compose.yml introuvable pour le projet ${appName}.`,
                     HttpStatusCodes.NOT_FOUND
                 );
-            }
-
+            }          
             await this._dockerManager.composeDown(folderPath)
             const containers: ContainerInfo[] = await this._dockerManager.getContainersInfos();
             const projectContainers: ContainerInfo[] = containers.filter(container =>
