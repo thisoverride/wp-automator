@@ -39,6 +39,29 @@ if ! wp core is-installed --path="${WP_PATH}" 2>/dev/null; then
         --admin_user="${WP_USER}" \
         --admin_password="${WP_PASSWORD}" \
         --admin_email="${WP_EMAIL}"
+        
+    # Création ou mise à jour du fichier .htaccess
+    echo 'Creating/updating .htaccess...'
+cat <<EOL > "${WP_PATH}/.htaccess"
+    # BEGIN WordPress
+    <IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+    RewriteRule ^index\.php$ - [L]
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule . /index.php [L]
+    </IfModule>
+
+    # Custom PHP settings
+    php_value upload_max_filesize 64M
+    php_value post_max_size 64M
+    php_value max_execution_time 300
+    php_value max_input_time 300
+
+    # END WordPress
+EOL
+
 else
     echo 'WordPress is already installed.'
 fi
