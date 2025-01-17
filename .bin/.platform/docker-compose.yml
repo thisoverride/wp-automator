@@ -17,7 +17,7 @@ services:
       PROJECT_NAME: ${PROJECT_NAME}
       SECRET_KEY: ${SECRET_KEY}
     volumes:
-      - wordpress_data:/var/www/html
+      - ./wordpress_data:/var/www/html
       - ./wait-for-db.sh:/usr/local/bin/wait-for-db.sh
       - ./wpcli_setup.sh:/usr/local/bin/wpcli_setup.sh
       - ./wp-cli.phar:/usr/local/bin/wp
